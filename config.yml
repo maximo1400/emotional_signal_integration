@@ -1,0 +1,95 @@
+sub_id: 4    # Subject ID to simulate (-1 for all subjects; 4 works well)
+emotion_range: [-1.0, 1.0]
+emotional_states_areas:
+  # Column 1 -> Low Valence [-1.0, -0.3]
+  - id: bored
+    label: "Bored"
+    range:
+      valence_min: -1.0
+      valence_max: -0.3
+      arousal_min: -1.0
+      arousal_max: -0.3
+
+  - id: frustrated
+    label: "Frustrated/Sad"
+    range:
+      valence_min: -1.0
+      valence_max: -0.3
+      arousal_min:  -0.3
+      arousal_max: 0.3
+      
+
+  - id: angry
+    label: "Angry"
+    range:
+      valence_min: -1.0
+      valence_max: -0.3
+      arousal_min:  0.3
+      arousal_max: 1.0
+
+  # Column 2  -> Mid Valence [-0.3, 0.3]
+  - id: tired
+    label: "Tired/Sleepy"
+    range:
+      valence_min: -0.3
+      valence_max: 0.3
+      arousal_min: -1.0
+      arousal_max: -0.3
+
+  - id: neutral
+    label: "Neutral"
+    range:
+      valence_min: -0.3
+      valence_max: 0.3
+      arousal_min: -0.3
+      arousal_max: 0.3
+
+  - id: surprise
+    label: "Surprise/Tense"
+    range:
+      valence_min: -0.3
+      valence_max: 0.3
+      arousal_min: 0.3
+      arousal_max: 1.0
+
+  # Column 3 -> High Valence [0.3, 1.0]
+  - id: calm
+    label: "Calm"
+    range:
+      valence_min: 0.3
+      valence_max: 1.0
+      arousal_min: -1.0
+      arousal_max: -0.3
+
+  - id: happy
+    label: "Happy/Pleased"
+    range:
+      valence_min: 0.3
+      valence_max: 1.0
+      arousal_min: -0.3
+      arousal_max: 0.3
+  
+  - id: excited
+    label: "Excited"
+    range:
+      valence_min: 0.3
+      valence_max: 1.0
+      arousal_min: 0.3
+      arousal_max: 1.0
+
+sequences:
+  basic:
+    - ["sad", 1]
+    - ["happy", 1]
+    - ["angry", 1]
+    - ["relaxed", 1]
+  extended:
+    - ["sad", 1]
+    - ["happy", 1.5]
+    - ["angry", 0.5]
+    - ["relaxed", 1]
+  neutral:
+    - ["neutral", 5]
+  bored_angry:
+    - ["bored", 2]
+    - ["angry", 2]

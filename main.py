@@ -1,0 +1,53 @@
+import time
+import threading
+import os
+import queue
+from dotenv import load_dotenv
+from Emotiv import Train
+
+load_dotenv()
+
+your_app_client_id = os.getenv("APP_CLIENT_ID")
+your_app_client_secret = os.getenv("APP_CLIENT_SECRET")
+
+
+def main() -> None:
+    # Please fill your application clientId and clientSecret before running script
+
+    # Init Train
+    profile_name = "Virtual"
+    out = queue.Queue()
+
+    # list data streams
+    streams = ["mot", "dev", "eq", "pow", "met", "com", "fac", "sys"]
+
+    if profile_name is None:
+        print("No profile name provided")
+        return
+
+    emotiv = Train(
+        your_app_client_id,
+        your_app_client_secret,
+        verbose=False,
+        emotiv_profile=profile_name,
+    )
+
+    t0 = time.time()
+    t = threading.Thread(target=emotiv.start, args=[profile_name, streams, out])
+    # t = threading.Thread(target=emotiv.start, args=(streams,))
+    t.start()
+
+    t.join()
+    t1 = time.time()
+    print(f"Tiempo de Aplicacion: {int(((t1 - t0) / 60) * 100) / 100} min")
+
+    if os.path.exists(f"sub_data/{profile_name}"):
+        profile_name = profile_name + "_" + str(int(time.time()))
+
+    os.mkdir(f"sub_data/{profile_name}")
+    for stream in emotiv.data:
+        emotiv.data[stream].to_csv(f"sub_data/{profile_name}/{stream}.csv")
+
+
+if __name__ == "__main__":
+    main()
