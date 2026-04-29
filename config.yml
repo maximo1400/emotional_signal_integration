@@ -1,4 +1,4 @@
-pow_data_source: "emotiv"  # "emotiv" or "virtual"
+pow_data_source: "virtual"  # "emotiv" or "virtual"
 sub_id: 4    # Subject ID to simulate (-1 for all subjects; 4 works well)
 
 sequences:

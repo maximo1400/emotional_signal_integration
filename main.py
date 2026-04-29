@@ -5,6 +5,7 @@ import queue
 from pathlib import Path
 import yaml
 import signal
+import pandas
 from dotenv import load_dotenv
 from L1_band_power_capture.Emotiv.Emotiv import Subcribe
 from L1_band_power_capture.Simulated_pow.EmotionSimulator import EmotionSimulator
@@ -51,11 +52,17 @@ def main() -> None:
     if config["pow_data_source"] == "virtual":
         # Virtual data source logic
         simulator = EmotionSimulator(l1_out)
-        # simulator.plot_emotion_distribution()
         simulator.main_loop()
 
+        l1_out_data_path = f"{OUTPUT_DIR}/{config['pow_data_source']}"
+        if os.path.exists(l1_out_data_path):
+            l1_out_data_path = l1_out_data_path + "_" + str(int(time.time()))
+
+        os.mkdir(l1_out_data_path)
+        simulator.output_df.to_csv(f"{l1_out_data_path}/pow.csv")
+
     else:  # Emotiv data source logic
-        profile_name = "Virtual"
+        profile_name = config["pow_data_source"]
         streams = ["mot", "dev", "eq", "pow", "met", "com", "fac", "sys"]
         emotiv_client_id = os.getenv("APP_CLIENT_ID")
         emotiv_client_secret = os.getenv("APP_CLIENT_SECRET")

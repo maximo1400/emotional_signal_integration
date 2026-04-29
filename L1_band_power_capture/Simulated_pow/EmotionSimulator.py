@@ -1,4 +1,5 @@
 import time
+import pandas
 import pyarrow.feather as feather
 import queue
 from pathlib import Path
@@ -36,10 +37,12 @@ class EmotionSimulator:
     sequence = []
     sub_id = None
     data_frec = EMOTIV_POW_FREC  # Hz
-    data = None
-    out_queue = None
+    data: pandas.DataFrame = None
+    out_queue: queue.Queue = None
+    output_df: pandas.DataFrame = None
+    output_rows = []
     emotiv_columns = POW_COLUMNS
-    emot_states = list(emot_states_area.keys())
+    emot_states = []
     pow_by_state = {}
     pow_read = {}
 
@@ -71,6 +74,7 @@ class EmotionSimulator:
             raise RuntimeError(f"Invalid YAML in {path}: {e}")
 
     def load_pow_data(self):
+        "Loads the power data from the feather file, normalizes the valence and arousal values to the defined emotion range and stores it in self.data."
         self.data = feather.read_feather(self.file_path)
 
         # normalize valence and arousal to self.emotion_range
@@ -91,6 +95,9 @@ class EmotionSimulator:
         ) + emot_min
 
     def add_emot_states(self):
+        """Assigns an emotional state to each row in self.data based on the valence and arousal values
+        and the defined emotional state areas."""
+
         self.data["state"] = "NA"  # Default state
         for state, ranges in self.emot_states_area.items():
             va_min, va_max = ranges["va"]
@@ -108,31 +115,35 @@ class EmotionSimulator:
             # print(self.data[condition].shape[0], "rows assigned to state", state)
 
     def get_emotion_pow(self):
+        "Organizes the power data by emotional state and initializes the read counters."
         for emot in self.emot_states:
-            s_state = self.data["state"] == emot
-            s_sub = self.data["subject_id"] == self.sub_id
-            mask = s_state & s_sub
-            if self.sub_id == -1:
-                mask = s_state
+            emot_state_mask = self.data["state"] == emot
+            subject_mask = self.data["subject_id"] == self.sub_id
+            mask = emot_state_mask & subject_mask
+            if self.sub_id == -1:  # If sub_id is -1, use all subjects data
+                mask = emot_state_mask
             data = self.data[mask].reindex(columns=self.emotiv_columns)
-            self.pow_by_state[emot] = data
+            self.pow_by_state[emot] = data.copy()
             self.pow_read[emot] = 0
             print(f"State '{emot}': {data.shape[0]} rows loaded.")
 
     def zero_pow_read(self):
+        """Resets the read count for each emotion state."""
         for emot in self.emot_states:
             self.pow_read[emot] = 0
 
     def imput_msg(self):
+        "returns the input message to select the sequence to simulate"
         msg = "Select sequence to simulate:\n"
         i = 0
         for key in self.sequences.keys():
             msg += f"{i} - {key}\n"
             i += 1
-        msg += "or 'q' to quit:\n"
+        msg += "or 'q' to save and quit:\n"
         return msg
 
     def decode_msg_num(self, msg_num):
+        "decodes the input number to the corresponding sequence key"
         i = 0
         for key in self.sequences.keys():
             if i == msg_num:
@@ -140,10 +151,13 @@ class EmotionSimulator:
             i += 1
 
     def main_loop(self):
+        """Main loop of the simulator, shows a menu to select the sequence to simulate and outputs
+        the pow data to the queue according to the selected sequence."""
         while True:
             msg = self.imput_msg()
             state = input(msg)
             if state == "q":
+                self.finalize_output_df()
                 break
             msg = self.decode_msg_num(int(state))
             if msg in self.sequences.keys():
@@ -153,9 +167,10 @@ class EmotionSimulator:
                 self.zero_pow_read()
 
     def output_loop(self):
+        "outputs pow data to the queue according to self.sequence"
         # print(self.data.columns)
         # print(self.data.head())
-        print(self.data["state"].value_counts())
+        # print(self.data["state"].value_counts())
 
         for idx in range(len(self.sequence)):
             state, duration = self.sequence[idx]
@@ -169,21 +184,28 @@ class EmotionSimulator:
 
                 # print(row.values.tolist())
                 self.update_queue(row.values.tolist())
-                time.sleep(1 / self.data_frec)
+                self.update_output_rows(row.values.tolist(), state)
                 self.pow_read[state] += 1
                 if self.pow_read[state] >= self.pow_by_state[state].shape[0]:
                     self.pow_read[state] = 0
+
+                time.sleep(1 / self.data_frec)
                 t_cur = time.time()
 
     def update_queue(self, pow) -> None:
-        # while not self.out_queue.empty():
-        #     time.sleep(0.1)
-
+        "adds the new pow data to the output queue"
         self.out_queue.put(pow)
         print(f"new data put in queue, mean: {sum(pow) / len(pow):.4f}")
 
-        # while not self.out_queue.empty():
-        #     time.sleep(0.1)
+    def update_output_rows(self, pow, emot_state):
+        "adds a new row to the output with the pow data, emotional state and timestamp"
+        new_row = pow + [emot_state, time.time()]
+        self.output_rows.append(new_row)
+
+    def finalize_output_df(self):
+        "finalizes the output dataframe by converting the output rows to a dataframe with the correct columns"
+        columns = self.emotiv_columns + ["emot_state", "timestamp"]
+        self.output_df = pandas.DataFrame(self.output_rows, columns=columns)
 
     def plot_emotion_distribution(self):
         plt.figure(figsize=(10, 6))
@@ -249,7 +271,7 @@ class EmotionSimulator:
 def main():
     out = queue.Queue()
     simulator = EmotionSimulator(out)
-    simulator.plot_emotion_distribution()
+    # simulator.plot_emotion_distribution()
     simulator.main_loop()
 
 
