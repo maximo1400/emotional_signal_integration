@@ -1,4 +1,23 @@
+pow_data_source: "virtual"  # "emotiv" or "virtual"
 sub_id: 4    # Subject ID to simulate (-1 for all subjects; 4 works well)
+
+sequences:
+  basic:
+    - ["frustrated", 1]
+    - ["happy", 1]
+    - ["angry", 1]
+    - ["neutral", 1]
+  extended:
+    - ["frustrated", 1]
+    - ["happy", 1.5]
+    - ["angry", 0.5]
+    - ["neutral", 1]
+  neutral:
+    - ["neutral", 5]
+  bored_angry:
+    - ["bored", 2]
+    - ["angry", 2]
+
 emotion_range: [-1.0, 1.0]
 emotional_states_areas:
   # Column 1 -> Low Valence [-1.0, -0.3]
@@ -76,20 +95,3 @@ emotional_states_areas:
       valence_max: 1.0
       arousal_min: 0.3
       arousal_max: 1.0
-
-sequences:
-  basic:
-    - ["sad", 1]
-    - ["happy", 1]
-    - ["angry", 1]
-    - ["relaxed", 1]
-  extended:
-    - ["sad", 1]
-    - ["happy", 1.5]
-    - ["angry", 0.5]
-    - ["relaxed", 1]
-  neutral:
-    - ["neutral", 5]
-  bored_angry:
-    - ["bored", 2]
-    - ["angry", 2]

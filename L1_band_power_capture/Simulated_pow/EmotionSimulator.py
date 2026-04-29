@@ -6,7 +6,7 @@ import yaml
 import matplotlib.pyplot as plt
 
 # fmt: off
-FILE_PATH = "emotion_data/Dreamer/dreamer_bandpower_frames.feather"
+FILE_PATH = "L1_band_power_capture/Simulated_pow/Data/Dreamer/dreamer_bandpower_frames.feather"
 YAML_PATH = "config.yml"
 POW_COLUMNS = [
         "AF3/theta", "AF3/alpha", "AF3/betaL", "AF3/betaH", "AF3/gamma",
@@ -155,7 +155,7 @@ class EmotionSimulator:
     def output_loop(self):
         # print(self.data.columns)
         # print(self.data.head())
-        # print(self.data["state"].value_counts())
+        print(self.data["state"].value_counts())
 
         for idx in range(len(self.sequence)):
             state, duration = self.sequence[idx]

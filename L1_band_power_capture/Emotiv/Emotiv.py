@@ -1,6 +1,6 @@
 import time
-import cortex
-from cortex import Cortex
+from . import cortex
+from L1_band_power_capture.Emotiv.cortex import Cortex
 import pandas as pd
 import queue
 
