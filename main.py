@@ -4,6 +4,7 @@ import os
 import queue
 from pathlib import Path
 import yaml
+import signal
 from dotenv import load_dotenv
 from L1_band_power_capture.Emotiv.Emotiv import Subcribe
 from L1_band_power_capture.Simulated_pow.EmotionSimulator import EmotionSimulator
@@ -15,6 +16,7 @@ YAML_PATH = "config.yml"
 OUTPUT_DIR = "L1_band_power_capture/output_data"
 
 
+# Load configuration from YAML file
 def load_yml_config(path: str | Path = YAML_PATH) -> dict:
     """Parse a YAML file and return the Python object it represents."""
     path = Path(path).expanduser()
@@ -23,6 +25,23 @@ def load_yml_config(path: str | Path = YAML_PATH) -> dict:
     dict["pow_data_source"] = yml_data["pow_data_source"]
 
     return dict
+
+
+# Create a stop event
+stop_event = threading.Event()
+
+
+# Handle Ctrl+C, used to kill emotiv thead
+def signal_handler(signum, frame):
+    print("\nStopping...")
+    stop_event.set()
+
+
+# Monitor the stop event and close the Emotiv connection when set
+def monitor_stop(emotiv, stop_event):
+    while not stop_event.is_set():
+        time.sleep(0.1)
+    emotiv.c.close()
 
 
 def main() -> None:
@@ -48,10 +67,19 @@ def main() -> None:
             emotiv_profile=profile_name,
         )
 
+        monitor_thread = threading.Thread(
+            target=monitor_stop, args=(emotiv, stop_event), daemon=True
+        )
+        monitor_thread.start()
+
+        signal.signal(signal.SIGINT, signal_handler)
+
         t0 = time.time()
         t = threading.Thread(target=emotiv.start, args=[profile_name, streams, l1_out])
+
         t.start()
-        t.join()
+        while t.is_alive():
+            t.join(timeout=1)
         t1 = time.time()
 
         print(f"Tiempo de Aplicacion: {int(((t1 - t0) / 60) * 100) / 100} min")
@@ -61,7 +89,7 @@ def main() -> None:
 
         os.mkdir(f"{OUTPUT_DIR}/{profile_name}")
         for stream in emotiv.data:
-            emotiv.data[stream].to_csv(f"sub_data/{profile_name}/{stream}.csv")
+            emotiv.data[stream].to_csv(f"{OUTPUT_DIR}/{profile_name}/{stream}.csv")
 
 
 if __name__ == "__main__":

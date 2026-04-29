@@ -58,7 +58,7 @@ class Subcribe:
         self.data = {}
         self.verbose = verbose
 
-    def start(self, profile_name, streams, queue: queue, headsetId=""):
+    def start(self, profile_name, streams, queue: queue, headsetId="", stop_event=None):
         """
         To start training process as below workflow
         (1) check access right -> authorize -> connect headset->create session
@@ -84,6 +84,7 @@ class Subcribe:
         self.streams = streams
         self.queue = queue
         self.c.set_wanted_profile(profile_name)
+        self.stop_event = stop_event
 
         if headsetId != "":
             self.c.set_wanted_headset(headsetId)
@@ -336,7 +337,9 @@ class Subcribe:
         pow_data = data["pow"] + [timestamp]
         self.data["pow"].loc[len(self.data["pow"])] = pow_data
         self.queue.put(data)
-        print("pow data put in queue: {}".format(pow_data))
+        mean_pow = sum(data["pow"]) / len(data["pow"])
+        print(f"pow data put in queue, mean pow: {mean_pow}")
+
         if self.verbose:
             print("pow data: {}".format(data))
 
