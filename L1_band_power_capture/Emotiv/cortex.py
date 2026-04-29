@@ -167,7 +167,7 @@ class Cortex(Dispatcher):
         # If you don't want to use the certificate, please replace by the below line  by sslopt={"cert_reqs": ssl.CERT_NONE}
         # sslopt = {"ca_certs": "./certificates/rootCA.pem", "cert_reqs": ssl.CERT_REQUIRED}
         sslopt = {
-            "ca_certs": "emotiv/certificates/rootCA.pem",
+            "ca_certs": "L1_band_power_capture/Emotiv/certificates/rootCA.pem",
             "cert_reqs": ssl.CERT_REQUIRED,
         }
 
