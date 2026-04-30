@@ -5,7 +5,6 @@ import queue
 from pathlib import Path
 import yaml
 import signal
-import pandas
 from dotenv import load_dotenv
 from L1_band_power_capture.Emotiv.Emotiv import Subcribe
 from L1_band_power_capture.Simulated_pow.EmotionSimulator import EmotionSimulator

@@ -45,6 +45,7 @@ class EmotionSimulator:
     emot_states = []
     pow_by_state = {}
     pow_read = {}
+    transition_duration = 0
 
     def __init__(self, queue: queue.Queue):
         self.out_queue = queue
@@ -70,6 +71,7 @@ class EmotionSimulator:
             self.sequences = yml_data["sequences"]
             self.sub_id = yml_data["sub_id"]
             self.emotion_range = yml_data["emotion_range"]
+            self.transition_duration = yml_data["transition_duration"]
         except yaml.YAMLError as e:
             raise RuntimeError(f"Invalid YAML in {path}: {e}")
 
@@ -174,6 +176,10 @@ class EmotionSimulator:
 
         for idx in range(len(self.sequence)):
             state, duration = self.sequence[idx]
+            next_state = (
+                self.sequence[idx + 1][0] if idx + 1 < len(self.sequence) else state
+            )
+
             t_start = time.time()
             t_cur = t_start
             while t_cur - t_start < duration:
@@ -181,10 +187,28 @@ class EmotionSimulator:
                 row = self.pow_by_state[state].iloc[
                     self.pow_read[state]
                 ]  # Get row in sequence
+                pow_data = row.values.tolist()
 
-                # print(row.values.tolist())
-                self.update_queue(row.values.tolist())
-                self.update_output_rows(row.values.tolist(), state)
+                # Check if we're in transition zone
+                t_in_state = t_cur - t_start
+                t_start_transition = duration - self.transition_duration
+                if t_in_state > t_start_transition and idx + 1 < len(self.sequence):
+                    # Blend with next state
+                    next_row = self.pow_by_state[next_state].iloc[
+                        self.pow_read[next_state]
+                    ]
+                    next_pow = next_row.values.tolist()
+
+                    # Linear interpolation weight
+                    blend = (t_in_state - t_start_transition) / self.transition_duration
+
+                    pow_data = [
+                        curr * (1 - blend) + next_val * blend
+                        for curr, next_val in zip(pow_data, next_pow)
+                    ]
+
+                self.update_queue(pow_data)
+                self.update_output_rows(pow_data, state)
                 self.pow_read[state] += 1
                 if self.pow_read[state] >= self.pow_by_state[state].shape[0]:
                     self.pow_read[state] = 0
