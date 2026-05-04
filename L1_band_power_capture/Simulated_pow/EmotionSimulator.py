@@ -124,8 +124,11 @@ class EmotionSimulator:
             mask = emot_state_mask & subject_mask
             if self.sub_id == -1:  # If sub_id is -1, use all subjects data
                 mask = emot_state_mask
-            data = self.data[mask].reindex(columns=self.emotiv_columns)
-            self.pow_by_state[emot] = data.copy()
+            data = self.data[mask].copy()
+            # Keep valence and arousal along with power columns
+            cols_to_keep = self.emotiv_columns + ["valence", "arousal"]
+            data = data[cols_to_keep]
+            self.pow_by_state[emot] = data
             self.pow_read[emot] = 0
             print(f"State '{emot}': {data.shape[0]} rows loaded.")
 
@@ -187,7 +190,10 @@ class EmotionSimulator:
                 row = self.pow_by_state[state].iloc[
                     self.pow_read[state]
                 ]  # Get row in sequence
-                pow_data = row.values.tolist()
+                pow_data = row[self.emotiv_columns].values.tolist()
+                valence = row["valence"]
+                arousal = row["arousal"]
+                smoothed = False
 
                 # Check if we're in transition zone
                 t_in_state = t_cur - t_start
@@ -197,7 +203,7 @@ class EmotionSimulator:
                     next_row = self.pow_by_state[next_state].iloc[
                         self.pow_read[next_state]
                     ]
-                    next_pow = next_row.values.tolist()
+                    next_pow = next_row[self.emotiv_columns].values.tolist()
 
                     # Linear interpolation weight
                     blend = (t_in_state - t_start_transition) / self.transition_duration
@@ -206,9 +212,10 @@ class EmotionSimulator:
                         curr * (1 - blend) + next_val * blend
                         for curr, next_val in zip(pow_data, next_pow)
                     ]
+                    smoothed = True
 
                 self.update_queue(pow_data)
-                self.update_output_rows(pow_data, state)
+                self.update_output_rows(pow_data, state, valence, arousal, smoothed)
                 self.pow_read[state] += 1
                 if self.pow_read[state] >= self.pow_by_state[state].shape[0]:
                     self.pow_read[state] = 0
@@ -221,14 +228,20 @@ class EmotionSimulator:
         self.out_queue.put(pow)
         print(f"new data put in queue, mean: {sum(pow) / len(pow):.4f}")
 
-    def update_output_rows(self, pow, emot_state):
-        "adds a new row to the output with the pow data, emotional state and timestamp"
-        new_row = pow + [emot_state, time.time()]
+    def update_output_rows(self, pow, emot_state, valence, arousal, smoothed):
+        "adds a new row to the output with the pow data, emotional state, valence, arousal, smoothed flag and timestamp"
+        new_row = pow + [valence, arousal, emot_state, smoothed, time.time()]
         self.output_rows.append(new_row)
 
     def finalize_output_df(self):
         "finalizes the output dataframe by converting the output rows to a dataframe with the correct columns"
-        columns = self.emotiv_columns + ["emot_state", "timestamp"]
+        columns = self.emotiv_columns + [
+            "valence",
+            "arousal",
+            "emot_state",
+            "smoothed",
+            "timestamp",
+        ]
         self.output_df = pandas.DataFrame(self.output_rows, columns=columns)
 
     def plot_emotion_distribution(self):
