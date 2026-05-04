@@ -1,8 +1,27 @@
+# Configuration file for the Emotiv data simulation and processing pipeline
+
+# Layer 1: Data Source Configuration
+
+# Choose the data source for the pipeline. Options:
+# - "emotiv": Use real data from the Emotiv dataset (requires dataset access and preprocessing)
+# - "virtual": Use simulated data based on predefined emotional state sequences
 pow_data_source: "virtual"  # "emotiv" or "virtual"
-sub_id: 4    # Subject ID to simulate (-1 for all subjects; 4 works well)
 
-transition_duration: 0  # Duration of transitions between emotional states in seconds
+## Virtual simulation parameters (only used if pow_data_source is set to "virtual")
+# If using virtual data, specify the subject ID to simulate. Set to -1 to simulate all subjects, 
+# or choose a specific subject ID (e.g., 4) for focused testing.
+# Not every subject in the Emotiv dataset has data for all emotional states, 4 works well enough for testing purposes.
+sub_id: 4 
 
+#If using virtual data, you can smoothly transition between emotional states by specifying a transition duration in seconds. 
+# Set to 0 for instant transitions, or a positive value (e.g., 1.0) for gradual transitions.
+transition_duration: 0  
+
+# If using virtual data, specify the sequence of emotional states to simulate. 
+#You can choose from predefined sequences or define your own.
+#Expected shape:
+# name_nequence:
+#  - [emotion_state, duration_in_seconds]
 sequences:
   basic:
     - ["frustrated", 1]
@@ -20,7 +39,11 @@ sequences:
     - ["bored", 2]
     - ["angry", 2]
 
+## Emotional simulator set up
+# Define the range of valence and arousal values for the emotional states.
+# Used to normalize the simulated emotional states.
 emotion_range: [-1.0, 1.0]
+# Define the emotional states and their corresponding areas in the valence-arousal space.
 emotional_states_areas:
   # Column 1 -> Low Valence [-1.0, -0.3]
   - id: bored
