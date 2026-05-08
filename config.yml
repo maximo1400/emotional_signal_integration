@@ -178,3 +178,25 @@ asymmetries:
 # - Hjorth mobility: Measures the mean frequency of the signal, which can reflect the overall activity level in the brain. Higher mobility may indicate more active brain states, while lower mobility may indicate more relaxed states.
 # - Hjorth complexity: Measures the complexity of the signal, which can reflect the variability and
 features_to_add: []  # List of additional features to add (e.g., ["hjorth_mobility", "hjorth_complexity"])
+
+# Classifier
+# Options: "random_forest", "svm", "knn"
+classifier: "random_forest"  # Classifier to use for emotion state estimation in Layer 2
+# Hyperparameters for the classifiers
+classifier_hyperparameters:
+  random_forest:
+    n_estimators: 100
+    max_depth: 10
+    random_state: 42
+  svm:
+    kernel: "rbf"
+    C: 1.0
+    gamma: "scale"
+  knn:
+    n_neighbors: 5
+    weights: "uniform"
+
+# Number of classes to predict. Same numer for both for valence and arousal.
+# Only tested for 1, 3 and 5 classes of each
+# num_classes = num_classes_valence * num_classes_arousal
+num_classes: 9
