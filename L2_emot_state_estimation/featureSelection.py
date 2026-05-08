@@ -1,27 +1,94 @@
-from main import load_yml_config
-import yaml
-import pandas as pd
-from pathlib import Path
 from typing import List
-
-
-YAML_PATH = "config.yml"
-OUTPUT_DIR = "L2_emot_state_estimation/output_data"
-
-
-def load_yml_config(path: str | Path = YAML_PATH) -> dict:
-    """Parse a YAML file and return the Python object it represents."""
-    path = Path(path).expanduser()
-    dict = {}
-    yml_data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    dict["feather_path"] = yml_data["feather_file_path"]
-    dict["POW_COLUMNS"] = yml_data["POW_COLUMNS"]
-
-    return dict
+from config_loader import get_config
+import numpy as np
 
 
 class features:
-    def __init__(self, pow: List[float]):
-        self.pow_columns = load_yml_config()["POW_COLUMNS"]
-        self.pow = pow
-        self.load()
+    def __init__(
+        self,
+        features=["l2_pow_columns", "features_to_add", "asymmetries"],
+    ):
+        self.pow_columns = []
+        self.pow_columns_mask = []
+        self.features_to_add = []
+        self.sensor_info = {}
+        self.col_index = {}
+        self.asymmetries = []
+        self.load_config(features)
+
+    def load_config(self, config_keys):
+        epoch_data = get_config(["POW_COLUMNS", "epoch_sensors"])
+        self.pow_columns = epoch_data["POW_COLUMNS"]
+        self.sensor_info = epoch_data["epoch_sensors"]
+        self.col_index = {col: i for i, col in enumerate(self.pow_columns)}
+
+        feat = get_config(config_keys)
+        self.features_to_add = feat["features_to_add"]
+        self.asymmetries = feat["asymmetries"]
+        self.pow_columns_mask = [True] * len(self.pow_columns)
+        l2_pow_columns = feat["l2_pow_columns"]
+        if len(l2_pow_columns) > 0:
+            self.pow_columns_mask = [col in l2_pow_columns for col in self.pow_columns]
+
+    def process_data(self, pow_data: List[float]) -> List[float]:
+        data = self.filter_pow_columns(pow_data)
+        data.extend(self.add_features(pow_data))
+        return data
+
+    def filter_pow_columns(self, pow_data: List[float]) -> List[float]:
+        return [val for val, keep in zip(pow_data, self.pow_columns_mask) if keep]
+
+    def add_features(self, pow_data: List[float]) -> List[float]:
+        features = []
+
+        for area, type, band in self.asymmetries:
+            print(f"Adding asymmetry feature: {area}_{type}_{band}")
+            features.extend(self.calc_asymmetry(pow_data, area, type, band))
+
+        for feat in self.features_to_add:
+            print(f"Adding feature: {feat}")
+
+        return features
+
+    def calc_asymmetry(
+        self,
+        pow_data: List[float],
+        area: str,
+        diff_method: str,
+        frec_band: str,
+        eps: float = 1e-10,
+    ) -> float:
+
+        if area == "frontal":
+            pairs = self.sensor_info["frontal_pairs"]
+        elif area == "parietal":
+            pairs = self.sensor_info["parietal_pairs"]
+        asym = []
+
+        for left, right in pairs:
+            print(f"Calculating parietal asymmetry for pair: {left} - {right}")
+            left_col = f"{left}/{frec_band}"
+            right_col = f"{right}/{frec_band}"
+
+            left_idx = self.col_index.get(left_col)
+            right_idx = self.col_index.get(right_col)
+
+            # Raw values with epsilon for numerical stability
+            left_raw = pow_data[left_idx] + eps
+            right_raw = pow_data[right_idx] + eps
+
+            if diff_method == "ratio":
+                asym.append(-np.log(right_raw / left_raw))
+            else:  # diff_method == "difference"
+                asym.append(-(np.log(right_raw) - np.log(left_raw)))
+
+        return np.mean(asym)
+
+    def calc_avg_frontal_beta(self, pow_data: List[float]) -> float:
+        beta_values = []
+        for electrode in self.sensor_info["frontal_electrodes"]:
+            for band in ["betaL", "betaH"]:
+                col_name = f"{electrode}/{band}"
+                idx = self.col_index.get(col_name)
+                beta_values.append(pow_data[idx])
+        return np.mean(beta_values)

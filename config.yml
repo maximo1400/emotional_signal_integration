@@ -140,5 +140,44 @@ emotional_states_areas:
 ## Emotiv config 
 # Define the columns to be used from the Emotiv dataset for power features.
 POW_COLUMNS: [AF3/theta, AF3/alpha, AF3/betaL, AF3/betaH, AF3/gamma, F7/theta, F7/alpha, F7/betaL, F7/betaH, F7/gamma, F3/theta, F3/alpha, F3/betaL, F3/betaH, F3/gamma, FC5/theta, FC5/alpha, FC5/betaL, FC5/betaH, FC5/gamma, T7/theta, T7/alpha, T7/betaL, T7/betaH, T7/gamma, P7/theta, P7/alpha, P7/betaL, P7/betaH, P7/gamma, O1/theta, O1/alpha, O1/betaL, O1/betaH, O1/gamma, O2/theta, O2/alpha, O2/betaL, O2/betaH, O2/gamma, P8/theta, P8/alpha, P8/betaL, P8/betaH, P8/gamma, T8/theta, T8/alpha, T8/betaL, T8/betaH, T8/gamma, FC6/theta, FC6/alpha, FC6/betaL, FC6/betaH, FC6/gamma, F4/theta, F4/alpha, F4/betaL, F4/betaH, F4/gamma, F8/theta, F8/alpha, F8/betaL, F8/betaH, F8/gamma, AF4/theta, AF4/alpha, AF4/betaL, AF4/betaH, AF4/gamma]
+epoch_sensors = {
+    "frontal_pairs": [
+        ("F3", "F4"),  # Primary frontal asymmetry
+        ("AF3", "AF4"),  # Anterior frontal
+        ("F7", "F8"),  # Lateral frontal
+    ],
+    "frontal_electrodes": ["F3", "F4", "AF3", "AF4", "F7", "F8", "FC5", "FC6"],
+    "parietal_pairs": [
+        ("P7", "P8"),  # Parietal asymmetry
+    ],
+    "parietal_electrodes": ["P7", "P8"],
+    "electrodes": ["AF3", "F7", "F3", "FC5", "T7", "P7", "O1", "O2", "P8", "T8", "FC6", "F4", "F8", "AF4"],
+    "frequency_bands": ["alpha", "betaL", "betaH", "theta", "gamma"]}
+
 
 ## Layer 2: Data Processing Configuration
+l2_output_folder: "L2_emot_state_estimation/output_data"  # Folder path to save the processed data from Layer 2
+
+## Feature selection configuration for Layer 2
+# If it's needed, you can specify wich pow_column you wish to use for the classifier in layer 2. 
+# If empty, all columns will be used.
+l2_pow_columns: []  # List of pow columns to use for feature selection in Layer 2 (e.g., ["AF3/theta", "F7/alpha"])
+# Extra features to add
+# Asymmetries and ratios can be powerful features for emotion recognition, as they capture the relative differences in brain activity between different regions. 
+# You can specify which asymmetry or ratio features to add to the dataset.
+# Format for asymmetries:
+# - [area, type, band]
+# area: "frontal" or "parietal"
+# type: "difference" (for differences) or "ratio" (for ratios). Both will be in log scale
+# band: "alpha", "betaL", "betaH", "theta", or "gamma"
+asymmetries: 
+  - ["frontal", "difference", "alpha"]  
+  - ["parietal", "difference", "alpha"]
+  - ["frontal", "ratio", "alpha"]
+
+# Implemented: 
+# - frontal_asymmetry_alpha: the difference in alpha power between the left and right frontal electrodes (e.g., F3 - F4)
+# - parietal_asymmetry_alpha: the difference in alpha power between the left and right parietal electrodes (e.g., P7 - P8)
+# - frontal_asymmetry_beta: the difference in beta power between the left and right frontal electrodes (e.g., F3 - F4)
+
+features_to_add: []  
