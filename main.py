@@ -2,29 +2,13 @@ import time
 import threading
 import os
 import queue
-from pathlib import Path
-import yaml
 import signal
 from dotenv import load_dotenv
 from L1_band_power_capture.Emotiv.Emotiv import Subcribe
 from L1_band_power_capture.Simulated_pow.EmotionSimulator import EmotionSimulator
+from config_loader import get_config
 
 load_dotenv()
-
-
-YAML_PATH = "config.yml"
-OUTPUT_DIR = "L1_band_power_capture/output_data"
-
-
-# Load configuration from YAML file
-def load_yml_config(path: str | Path = YAML_PATH) -> dict:
-    """Parse a YAML file and return the Python object it represents."""
-    path = Path(path).expanduser()
-    dict = {}
-    yml_data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    dict["pow_data_source"] = yml_data["pow_data_source"]
-
-    return dict
 
 
 # Create a stop event
@@ -45,7 +29,10 @@ def monitor_stop(emotiv, stop_event):
 
 
 def main() -> None:
-    config = load_yml_config()
+    config = get_config(
+        ["pow_data_source", "L1_output_folder", "emotiv_streams", "profile_name"]
+    )
+
     # L1
     l1_out = queue.Queue()
     if config["pow_data_source"] == "virtual":
@@ -53,7 +40,7 @@ def main() -> None:
         simulator = EmotionSimulator(l1_out)
         simulator.main_loop()
 
-        l1_out_data_path = f"{OUTPUT_DIR}/{config['pow_data_source']}"
+        l1_out_data_path = f"{config['L1_output_folder']}/{config['pow_data_source']}"
         if os.path.exists(l1_out_data_path):
             l1_out_data_path = l1_out_data_path + "_" + str(int(time.time()))
 
@@ -61,8 +48,8 @@ def main() -> None:
         simulator.output_df.to_csv(f"{l1_out_data_path}/pow.csv")
 
     else:  # Emotiv data source logic
-        profile_name = config["pow_data_source"]
-        streams = ["mot", "dev", "eq", "pow", "met", "com", "fac", "sys"]
+        profile_name = config["profile_name"]
+        streams = config["emotiv_streams"]
         emotiv_client_id = os.getenv("APP_CLIENT_ID")
         emotiv_client_secret = os.getenv("APP_CLIENT_SECRET")
 
@@ -90,12 +77,13 @@ def main() -> None:
 
         print(f"Tiempo de Aplicacion: {int(((t1 - t0) / 60) * 100) / 100} min")
 
-        if os.path.exists(f"{OUTPUT_DIR}/{profile_name}"):
-            profile_name = profile_name + "_" + str(int(time.time()))
+        l1_out_data_path = f"{config['L1_output_folder']}/{profile_name}"
+        if os.path.exists(l1_out_data_path):
+            l1_out_data_path = l1_out_data_path + "_" + str(int(time.time()))
 
-        os.mkdir(f"{OUTPUT_DIR}/{profile_name}")
+        os.mkdir(l1_out_data_path)
         for stream in emotiv.data:
-            emotiv.data[stream].to_csv(f"{OUTPUT_DIR}/{profile_name}/{stream}.csv")
+            emotiv.data[stream].to_csv(f"{l1_out_data_path}/{stream}.csv")
 
 
 if __name__ == "__main__":

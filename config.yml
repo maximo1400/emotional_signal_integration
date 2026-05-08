@@ -7,6 +7,19 @@
 # - "virtual": Use simulated data based on predefined emotional state sequences
 pow_data_source: "virtual"  # "emotiv" or "virtual"
 
+# Folder path to save the captured data. This is where the output from the L1 layer will be stored.
+L1_output_folder: "L1_band_power_capture/output_data"
+
+## Emotiv headset configuration
+# Emotiv streams, specify which streams to capture from the Emotiv dataset.
+# It should at least include 'pow', for the band power features, but you can include others as needed for your application.e
+emotiv_streams: ["mot", "dev", "eq", "pow", "met", "com", "fac", "sys"]
+
+# Profile name
+# Used to name the output folder for the captured data.
+# Also used to identify the profile in the Emotiv servers
+profile_name: "Emotiv"
+
 ## Virtual simulation parameters (only used if pow_data_source is set to "virtual")
 # If using virtual data, specify the subject ID to simulate. Set to -1 to simulate all subjects, 
 # or choose a specific subject ID (e.g., 4) for focused testing.
