@@ -13,83 +13,9 @@ class VAClassifier:
     """
     Stub valence-arousal classifier.
 
-    Input: power vector (floats) in order of POW_COLUMNS
+    Input: power vector (floats) in order of pow_columns
     Output: {valence, arousal, label, confidence}
     """
-
-    # POW_COLUMNS from L1 (must match exactly)
-    POW_COLUMNS = [
-        "AF3/theta",
-        "AF3/alpha",
-        "AF3/betaL",
-        "AF3/betaH",
-        "AF3/gamma",
-        "F7/theta",
-        "F7/alpha",
-        "F7/betaL",
-        "F7/betaH",
-        "F7/gamma",
-        "F3/theta",
-        "F3/alpha",
-        "F3/betaL",
-        "F3/betaH",
-        "F3/gamma",
-        "FC5/theta",
-        "FC5/alpha",
-        "FC5/betaL",
-        "FC5/betaH",
-        "FC5/gamma",
-        "T7/theta",
-        "T7/alpha",
-        "T7/betaL",
-        "T7/betaH",
-        "T7/gamma",
-        "P7/theta",
-        "P7/alpha",
-        "P7/betaL",
-        "P7/betaH",
-        "P7/gamma",
-        "O1/theta",
-        "O1/alpha",
-        "O1/betaL",
-        "O1/betaH",
-        "O1/gamma",
-        "O2/theta",
-        "O2/alpha",
-        "O2/betaL",
-        "O2/betaH",
-        "O2/gamma",
-        "P8/theta",
-        "P8/alpha",
-        "P8/betaL",
-        "P8/betaH",
-        "P8/gamma",
-        "T8/theta",
-        "T8/alpha",
-        "T8/betaL",
-        "T8/betaH",
-        "T8/gamma",
-        "FC6/theta",
-        "FC6/alpha",
-        "FC6/betaL",
-        "FC6/betaH",
-        "FC6/gamma",
-        "F4/theta",
-        "F4/alpha",
-        "F4/betaL",
-        "F4/betaH",
-        "F4/gamma",
-        "F8/theta",
-        "F8/alpha",
-        "F8/betaL",
-        "F8/betaH",
-        "F8/gamma",
-        "AF4/theta",
-        "AF4/alpha",
-        "AF4/betaL",
-        "AF4/betaH",
-        "AF4/gamma",
-    ]
 
     # Emotion ranges for VA space
     VA_RANGES = {
@@ -104,7 +30,9 @@ class VAClassifier:
         "excited": {"valence": (0.3, 1.0), "arousal": (0.3, 1.0)},
     }
 
-    def __init__(self, model_path: str = None):
+    def __init__(
+        self, pow_columns: list, emotional_states_areas: list, model_path: str = None
+    ):
         """
         Initialize classifier.
 
@@ -113,6 +41,8 @@ class VAClassifier:
         """
         self.model_path = model_path
         self.model = None
+        self.pow_columns = pow_columns
+        self.emotional_states_areas = emotional_states_areas
         print("VAClassifier initialized (stub mode).")
 
     def predict(self, pow_vector: List[float]) -> Dict:
@@ -120,15 +50,11 @@ class VAClassifier:
         Predict valence and arousal from a power vector.
 
         Args:
-            pow_vector: List of power values (70 features) in POW_COLUMNS order
+            pow_vector: List of power values (70 features) in pow_columns order
 
         Returns:
             Dict with keys: valence, arousal, label, confidence, timestamp
         """
-        if len(pow_vector) != len(self.POW_COLUMNS):
-            raise ValueError(
-                f"Expected {len(self.POW_COLUMNS)} power values, got {len(pow_vector)}"
-            )
 
         # STUB: Simple heuristic classifier
         # Replace this with a trained model (sklearn, PyTorch, etc.)
@@ -139,13 +65,13 @@ class VAClassifier:
         # Alpha / (Beta + Theta) -> arousal proxy
         # Frontal alpha asymmetry -> valence proxy
 
-        alpha_indices = [i for i, col in enumerate(self.POW_COLUMNS) if "alpha" in col]
+        alpha_indices = [i for i, col in enumerate(self.pow_columns) if "alpha" in col]
         beta_indices = [
             i
-            for i, col in enumerate(self.POW_COLUMNS)
+            for i, col in enumerate(self.pow_columns)
             if "betaL" in col or "betaH" in col
         ]
-        theta_indices = [i for i, col in enumerate(self.POW_COLUMNS) if "theta" in col]
+        theta_indices = [i for i, col in enumerate(self.pow_columns) if "theta" in col]
 
         alpha_mean = np.mean(pow_array[alpha_indices]) if alpha_indices else 0.0
         beta_mean = np.mean(pow_array[beta_indices]) if beta_indices else 0.0
@@ -156,10 +82,10 @@ class VAClassifier:
 
         # Simple frontal asymmetry: left vs right frontal regions
         left_frontal = [
-            i for i, col in enumerate(self.POW_COLUMNS) if "F3" in col or "AF3" in col
+            i for i, col in enumerate(self.pow_columns) if "F3" in col or "AF3" in col
         ]
         right_frontal = [
-            i for i, col in enumerate(self.POW_COLUMNS) if "F4" in col or "AF4" in col
+            i for i, col in enumerate(self.pow_columns) if "F4" in col or "AF4" in col
         ]
 
         left_power = np.mean(pow_array[left_frontal]) if left_frontal else 0.0

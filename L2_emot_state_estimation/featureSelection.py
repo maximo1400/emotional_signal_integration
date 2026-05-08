@@ -1,9 +1,16 @@
+import sys
+from pathlib import Path
+import time
 from typing import List
+
+# Add parent directory to path to import config_loader
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from config_loader import get_config
 import numpy as np
 
 
-class features:
+class FeatureSelector:
     def __init__(
         self,
         features=["l2_pow_columns", "features_to_add", "asymmetries"],
@@ -15,6 +22,8 @@ class features:
         self.col_index = {}
         self.asymmetries = []
         self.load_config(features)
+        self.labels = self.get_final_feature_names()
+        self.pow = []
 
     def load_config(self, config_keys):
         epoch_data = get_config(["POW_COLUMNS", "epoch_sensors"])
@@ -33,20 +42,36 @@ class features:
     def process_data(self, pow_data: List[float]) -> List[float]:
         data = self.filter_pow_columns(pow_data)
         data.extend(self.add_features(pow_data))
+        row = data + [time.time()]
+        self.pow.append(row)
         return data
+
+    def get_final_feature_names(self) -> List[str]:
+        feature_names = [
+            col for col, keep in zip(self.pow_columns, self.pow_columns_mask) if keep
+        ]
+
+        for area, type, band in self.asymmetries:
+            feature_names.append(f"{area}_{type}_{band}_asymmetry")
+
+        for feat in self.features_to_add:
+            feature_names.append(feat)
+
+        feature_names.append("timestamp")
+        return feature_names
 
     def filter_pow_columns(self, pow_data: List[float]) -> List[float]:
         return [val for val, keep in zip(pow_data, self.pow_columns_mask) if keep]
 
     def add_features(self, pow_data: List[float]) -> List[float]:
         features = []
-
         for area, type, band in self.asymmetries:
-            print(f"Adding asymmetry feature: {area}_{type}_{band}")
-            features.extend(self.calc_asymmetry(pow_data, area, type, band))
+            # print(f"Adding asymmetry feature: {area}_{type}_{band}")
+            features.append(self.calc_asymmetry(pow_data, area, type, band))
 
         for feat in self.features_to_add:
-            print(f"Adding feature: {feat}")
+            # print(f"Adding feature: {feat}")
+            pass
 
         return features
 
@@ -66,7 +91,7 @@ class features:
         asym = []
 
         for left, right in pairs:
-            print(f"Calculating parietal asymmetry for pair: {left} - {right}")
+            # print(f"Calculating {area} asymmetry for pair: {left} - {right}")
             left_col = f"{left}/{frec_band}"
             right_col = f"{right}/{frec_band}"
 
@@ -78,9 +103,9 @@ class features:
             right_raw = pow_data[right_idx] + eps
 
             if diff_method == "ratio":
-                asym.append(-np.log(right_raw / left_raw))
+                asym.append(-(right_raw / left_raw))
             else:  # diff_method == "difference"
-                asym.append(-(np.log(right_raw) - np.log(left_raw)))
+                asym.append(-((right_raw) - (left_raw)))
 
         return np.mean(asym)
 

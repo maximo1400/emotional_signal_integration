@@ -2,55 +2,55 @@
 Layer 2 Runner: Example of how to use the classifier with L1 output
 
 Modes:
-1. queue_mode: Connect to live L1 output queue (real-time)
-2. csv_mode: Process L1 output CSV (batch)
+1. feather_mode: Process L1 output from Feather file (DREAMER dataset)
+2. queue_mode: Connect to live L1 output queue (real-time)
+3. csv_mode: Process L1 output CSV (batch)
 """
 
 import json
 import os
+import sys
 import time
 from pathlib import Path
 import pyarrow.feather as feather
-import yaml
 import pandas as pd
 
+from featureSelection import FeatureSelector
 from classifier import VAClassifier
 from consumer import QueueConsumer, CSVConsumer
 
-YAML_PATH = "config.yml"
-OUTPUT_DIR = "L2_emot_state_estimation/output_data"
+# Add parent directory to path to import config_loader
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config_loader import get_config
 
 
-def load_yml_config(path: str | Path = YAML_PATH) -> dict:
-    """Parse a YAML file and return the Python object it represents."""
-    path = Path(path).expanduser()
-    dict = {}
-    yml_data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    dict["feather_path"] = yml_data["feather_file_path"]
-    dict["POW_COLUMNS"] = yml_data["POW_COLUMNS"]
-
-    return dict
-
-
-def run_feather_mode(feather_path: str, pow_columns: list):
+def run_feather_mode(
+    feather_path: str, pow_columns: list, output_dir: str, emotional_states_areas: list
+):
     """
-    Process L1 output from Feather file (DREAMER).
+    Process from Feather file (DREAMER).
 
     Args:
         feather_path: Path to L1 output Feather file
+        pow_columns: List of column names for power features in the Feather file
+        output_dir: Directory to save L2 predictions CSV
     """
     print(f"Running L2 in Feather mode: {feather_path}")
 
     # Initialize classifier and consumer
-    classifier = VAClassifier()
+    classifier = VAClassifier(pow_columns, emotional_states_areas)
 
     # Load Feather file (DREAMER format)
 
     df = feather.read_feather(feather_path)
+    df = df.head(20)
+
+    feat_select = FeatureSelector()
 
     predictions = []
     for i, row in df.iterrows():
         pow_vector = [row[col] for col in pow_columns]
+        pow_vector = feat_select.process_data(pow_vector)
         result = classifier.predict(pow_vector)
 
         pred_row = {
@@ -67,12 +67,19 @@ def run_feather_mode(feather_path: str, pow_columns: list):
 
     # Save predictions to CSV
     df_pred = pd.DataFrame(predictions)
-    if os.path.exists(f"{OUTPUT_DIR}/predictions.csv"):
-        output_csv = Path(f"{OUTPUT_DIR}/predictions{str(int(time.time()))}.csv")
+    df_features = pd.DataFrame(feat_select.pow, columns=feat_select.labels)
+
+    if os.path.exists(f"{output_dir}/predictions.csv"):
+        time_stamp = str(int(time.time()))
+        output_csv = Path(f"{output_dir}/predictions{time_stamp}.csv")
+        features_csv = Path(f"{output_dir}/features{time_stamp}.csv")
     else:
-        output_csv = Path(f"{OUTPUT_DIR}/predictions.csv")
+        output_csv = Path(f"{output_dir}/predictions.csv")
+        features_csv = Path(f"{output_dir}/features.csv")
     df_pred.to_csv(output_csv, index=False)
+    df_features.to_csv(features_csv, index=False)
     print(f"Predictions saved to {output_csv}")
+    print(f"Features saved to {features_csv}")
 
 
 def run_csv_mode(csv_path: str, output_csv: str = None):
@@ -186,10 +193,22 @@ def run_queue_mode(l1_queue, duration_sec: int = 10, output_json: str = None):
 
 
 if __name__ == "__main__":
-    config = load_yml_config()
+    config = get_config(
+        [
+            "feather_file_path",
+            "POW_COLUMNS",
+            "l2_output_folder",
+            "emotional_states_areas",
+        ]
+    )
 
     # Run in Feather mode (DREAMER dataset)
-    run_feather_mode(config["feather_path"], config["POW_COLUMNS"])
+    run_feather_mode(
+        config["feather_file_path"],
+        config["POW_COLUMNS"],
+        config["l2_output_folder"],
+        config["emotional_states_areas"],
+    )
 
     # Run in CSV mode (L1 output CSV)
     # run_csv_mode("L1_output.csv")
