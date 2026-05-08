@@ -69,13 +69,11 @@ def run_feather_mode(
     df_pred = pd.DataFrame(predictions)
     df_features = pd.DataFrame(feat_select.pow, columns=feat_select.labels)
 
-    if os.path.exists(f"{output_dir}/predictions.csv"):
-        time_stamp = str(int(time.time()))
-        output_csv = Path(f"{output_dir}/predictions{time_stamp}.csv")
-        features_csv = Path(f"{output_dir}/features{time_stamp}.csv")
-    else:
-        output_csv = Path(f"{output_dir}/predictions.csv")
-        features_csv = Path(f"{output_dir}/features.csv")
+    time_stamp = str(int(time.time()))
+    os.makedirs(f"{output_dir}/{time_stamp}", exist_ok=True)
+    output_csv = Path(f"{output_dir}/{time_stamp}/predictions.csv")
+    features_csv = Path(f"{output_dir}/{time_stamp}/features.csv")
+
     df_pred.to_csv(output_csv, index=False)
     df_features.to_csv(features_csv, index=False)
     print(f"Predictions saved to {output_csv}")
