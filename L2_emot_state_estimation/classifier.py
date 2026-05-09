@@ -17,19 +17,6 @@ class VAClassifier:
     Output: {valence, arousal, label, confidence}
     """
 
-    # Emotion ranges for VA space
-    VA_RANGES = {
-        "bored": {"valence": (-1.0, -0.3), "arousal": (-1.0, -0.3)},
-        "frustrated": {"valence": (-1.0, -0.3), "arousal": (-0.3, 0.3)},
-        "angry": {"valence": (-1.0, -0.3), "arousal": (0.3, 1.0)},
-        "tired": {"valence": (-0.3, 0.3), "arousal": (-1.0, -0.3)},
-        "neutral": {"valence": (-0.3, 0.3), "arousal": (-0.3, 0.3)},
-        "surprise": {"valence": (-0.3, 0.3), "arousal": (0.3, 1.0)},
-        "calm": {"valence": (0.3, 1.0), "arousal": (-1.0, -0.3)},
-        "happy": {"valence": (0.3, 1.0), "arousal": (-0.3, 0.3)},
-        "excited": {"valence": (0.3, 1.0), "arousal": (0.3, 1.0)},
-    }
-
     def __init__(
         self, pow_columns: list, emotional_states_areas: list, model_path: str = None
     ):
@@ -42,8 +29,33 @@ class VAClassifier:
         self.model_path = model_path
         self.model = None
         self.pow_columns = pow_columns
-        self.emotional_states_areas = emotional_states_areas
+        self.emot_states_areas = self._reshape_va_ranges(emotional_states_areas)
         print("VAClassifier initialized (stub mode).")
+
+    def _reshape_va_ranges(self, emot_states_areas) -> Dict:
+        """
+        Reshape emotional_states_areas for ease of use.
+        Args:
+            emotional_states_areas: Input data (dict, list, or other format)
+
+        Returns:
+            Dict: Converted format to:
+        { "emotion_label": {"valence": (min, max),"arousal": (min, max)}...}
+        """
+
+        reshaped = {}
+        for item in emot_states_areas:
+            label = item["label"]
+            # id = item["id"]
+            val_min = item["valence_min"]
+            val_max = item["valence_max"]
+            ar_min = item["arousal_min"]
+            ar_max = item["arousal_max"]
+            reshaped[label] = {
+                "valence": (val_min, val_max),
+                "arousal": (ar_min, ar_max),
+            }
+        return reshaped 
 
     def predict(self, pow_vector: List[float]) -> Dict:
         """
@@ -115,7 +127,7 @@ class VAClassifier:
         min_dist = float("inf")
         best_label = "neutral"
 
-        for label, ranges in self.VA_RANGES.items():
+        for label, ranges in self.emot_states_areas.items():
             val_mid = (ranges["valence"][0] + ranges["valence"][1]) / 2
             ar_mid = (ranges["arousal"][0] + ranges["arousal"][1]) / 2
 
