@@ -198,5 +198,5 @@ classifier_hyperparameters:
 
 # Number of classes to predict. Same numer for both for valence and arousal.
 # Only tested for 1, 3 and 5 classes of each
-# num_classes = num_classes_valence * num_classes_arousal
-num_classes: 9
+# The real number of classes will be num_classes^2, as we are predicting both valence and arousal states.
+num_classes: 3

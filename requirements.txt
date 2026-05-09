@@ -10,3 +10,5 @@ torcheeg
 pyyaml
 websocket-client
 python-dispatch
+scikit-learn
+joblib

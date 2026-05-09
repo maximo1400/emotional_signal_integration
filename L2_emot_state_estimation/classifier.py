@@ -1,143 +1,334 @@
 """
-Valence-Arousal Classifier Stub
+Valence-Arousal Classifier Selector / Manager
 
-Skeleton classifier that consumes power vectors and outputs
-valence/arousal estimates. Can be replaced with a trained model.
+This module provides:
+- `BaseClassifier` abstract interface for classifier implementations
+- simple adapter skeletons for KNN/SVM/RandomForest
+- `ClassifierManager` — registry + selector that instantiates the chosen classifier
+- backward-compatible `VAClassifier` wrapper to preserve existing constructor usage
 """
 
+import abc
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Optional, Type
+import joblib
 
 
-class VAClassifier:
+def _reshape_va_ranges(emot_states_areas) -> Dict:
     """
-    Stub valence-arousal classifier.
+    Convert input emotional state areas into the canonical mapping:
+    { "label": {"valence": (min, max), "arousal": (min, max)} }
 
-    Input: power vector (floats) in order of pow_columns
-    Output: {valence, arousal, label, confidence}
     """
+
+    reshaped = {}
+    # list-of-dicts format
+    for item in emot_states_areas:
+        label = item["label"]
+        # id = item["id"]
+        val_min = item["valence_min"]
+        val_max = item["valence_max"]
+        ar_min = item["arousal_min"]
+        ar_max = item["arousal_max"]
+        reshaped[label] = {
+            "valence": (val_min, val_max),
+            "arousal": (ar_min, ar_max),
+        }
+    return reshaped
+
+
+def _label_to_va(label: str, emot_states_areas: Dict) -> Dict:
+    """Convert an emotion label into a representative VA point."""
+    ranges = emot_states_areas.get(label)
+
+    valence = ranges["valence"]
+    arousal = ranges["arousal"]
+    return {
+        "valence": float((valence[0] + valence[1]) / 2),
+        "arousal": float((arousal[0] + arousal[1]) / 2),
+    }
+
+
+def _normalise_prediction_output(prediction) -> str:
+    """Convert sklearn outputs to a stable label string."""
+    if isinstance(prediction, np.ndarray):
+        if prediction.size == 1:
+            return str(prediction.item())
+        return str(prediction.tolist())
+    return str(prediction)
+
+
+class BaseClassifier(abc.ABC):
+    """Abstract base for classifier implementations."""
+
+    name: str = "base"
+
+    @abc.abstractmethod
+    def predict(self, pow_vector: List[float]) -> Dict:
+        raise NotImplementedError()
+
+    def batch_predict(self, pow_vectors: List[List[float]]) -> List[Dict]:
+        return [self.predict(v) for v in pow_vectors]
+
+    def load_model(self, model_path: Optional[str] = None):
+        """Optional model loading hook for adapters."""
+        return None
+
+
+# Adapter skeletons for external model wrappers
+class KNNClassifierAdapter(BaseClassifier):
+    name = "knn"
 
     def __init__(
-        self, pow_columns: list, emotional_states_areas: list, model_path: str = None
+        self,
+        pow_columns: list,
+        emot_states_areas: list,
+        model_path: Optional[str] = None,
+        hyperparams: Optional[dict] = None,
     ):
-        """
-        Initialize classifier.
-
-        Args:
-            model_path: Path to a trained model (optional, not used in stub)
-        """
-        self.model_path = model_path
-        self.model = None
         self.pow_columns = pow_columns
-        self.emot_states_areas = self._reshape_va_ranges(emotional_states_areas)
-        print("VAClassifier initialized (stub mode).")
+        self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
+        self.model = None
+        self.hyperparams = hyperparams or {}
+        self.model_path = model_path
+        if model_path:
+            self.load_model(model_path)
 
-    def _reshape_va_ranges(self, emot_states_areas) -> Dict:
-        """
-        Reshape emotional_states_areas for ease of use.
-        Args:
-            emotional_states_areas: Input data (dict, list, or other format)
+    def load_model(self, model_path: Optional[str] = None):
+        self.model_path = model_path or self.model_path
 
-        Returns:
-            Dict: Converted format to:
-        { "emotion_label": {"valence": (min, max),"arousal": (min, max)}...}
-        """
-
-        reshaped = {}
-        for item in emot_states_areas:
-            label = item["label"]
-            # id = item["id"]
-            val_min = item["valence_min"]
-            val_max = item["valence_max"]
-            ar_min = item["arousal_min"]
-            ar_max = item["arousal_max"]
-            reshaped[label] = {
-                "valence": (val_min, val_max),
-                "arousal": (ar_min, ar_max),
-            }
-        return reshaped 
+        loaded = joblib.load(self.model_path)
+        self.model = (
+            loaded.get("model")
+            if isinstance(loaded, dict) and "model" in loaded
+            else loaded
+        )
+        return self.model
 
     def predict(self, pow_vector: List[float]) -> Dict:
-        """
-        Predict valence and arousal from a power vector.
+        if self.model is None:
+            raise RuntimeError("KNN model is not loaded")
 
-        Args:
-            pow_vector: List of power values (70 features) in pow_columns order
+        features = np.asarray(pow_vector, dtype=float).reshape(1, -1)
+        prediction = self.model.predict(features)[0]
+        label = _normalise_prediction_output(prediction)
 
-        Returns:
-            Dict with keys: valence, arousal, label, confidence, timestamp
-        """
-
-        # STUB: Simple heuristic classifier
-        # Replace this with a trained model (sklearn, PyTorch, etc.)
-
-        pow_array = np.array(pow_vector)
-
-        # Example: use band ratios as features
-        # Alpha / (Beta + Theta) -> arousal proxy
-        # Frontal alpha asymmetry -> valence proxy
-
-        alpha_indices = [i for i, col in enumerate(self.pow_columns) if "alpha" in col]
-        beta_indices = [
-            i
-            for i, col in enumerate(self.pow_columns)
-            if "betaL" in col or "betaH" in col
-        ]
-        theta_indices = [i for i, col in enumerate(self.pow_columns) if "theta" in col]
-
-        alpha_mean = np.mean(pow_array[alpha_indices]) if alpha_indices else 0.0
-        beta_mean = np.mean(pow_array[beta_indices]) if beta_indices else 0.0
-        theta_mean = np.mean(pow_array[theta_indices]) if theta_indices else 0.0
-
-        # Normalize to [-1, 1]
-        arousal = self._normalize_to_va(alpha_mean / (beta_mean + theta_mean + 1e-6))
-
-        # Simple frontal asymmetry: left vs right frontal regions
-        left_frontal = [
-            i for i, col in enumerate(self.pow_columns) if "F3" in col or "AF3" in col
-        ]
-        right_frontal = [
-            i for i, col in enumerate(self.pow_columns) if "F4" in col or "AF4" in col
-        ]
-
-        left_power = np.mean(pow_array[left_frontal]) if left_frontal else 0.0
-        right_power = np.mean(pow_array[right_frontal]) if right_frontal else 0.0
-
-        valence = self._normalize_to_va(right_power - left_power)
-
-        # Map to emotion label
-        label = self._map_to_label(valence, arousal)
-
-        # Stub confidence (in real model, use model output probabilities)
         confidence = 0.65
+        if hasattr(self.model, "predict_proba"):
+            try:
+                probabilities = self.model.predict_proba(features)[0]
+                confidence = float(np.max(probabilities))
+                if hasattr(self.model, "classes_"):
+                    class_index = int(np.argmax(probabilities))
+                    label = _normalise_prediction_output(
+                        self.model.classes_[class_index]
+                    )
+            except Exception:
+                pass
 
+        va = _label_to_va(label, self.emot_states_areas)
         return {
-            "valence": valence,
-            "arousal": arousal,
+            "valence": va["valence"],
+            "arousal": va["arousal"],
             "label": label,
             "confidence": confidence,
         }
 
-    def _normalize_to_va(self, value: float, scale: float = 1.0) -> float:
-        """Normalize a raw feature to [-1, 1] VA range."""
-        return float(np.tanh(value * scale))
 
-    def _map_to_label(self, valence: float, arousal: float) -> str:
-        """Map (valence, arousal) to closest emotion label."""
-        min_dist = float("inf")
-        best_label = "neutral"
+class SVMClassifierAdapter(BaseClassifier):
+    name = "svm"
 
-        for label, ranges in self.emot_states_areas.items():
-            val_mid = (ranges["valence"][0] + ranges["valence"][1]) / 2
-            ar_mid = (ranges["arousal"][0] + ranges["arousal"][1]) / 2
+    def __init__(
+        self,
+        pow_columns: list,
+        emot_states_areas: list,
+        model_path: Optional[str] = None,
+        hyperparams: Optional[dict] = None,
+    ):
+        self.pow_columns = pow_columns
+        self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
+        self.model = None
+        self.hyperparams = hyperparams or {}
+        self.model_path = model_path
+        if model_path:
+            self.load_model(model_path)
 
-            dist = (valence - val_mid) ** 2 + (arousal - ar_mid) ** 2
-            if dist < min_dist:
-                min_dist = dist
-                best_label = label
+    def load_model(self, model_path: Optional[str] = None):
+        self.model_path = model_path or self.model_path
+        if not self.model_path:
+            return None
+        if joblib is None:
+            raise ImportError("joblib is required to load sklearn models")
 
-        return best_label
+        loaded = joblib.load(self.model_path)
+        self.model = (
+            loaded.get("model")
+            if isinstance(loaded, dict) and "model" in loaded
+            else loaded
+        )
+        return self.model
+
+    def predict(self, pow_vector: List[float]) -> Dict:
+        if self.model is None:
+            raise RuntimeError("SVM model is not loaded")
+
+        features = np.asarray(pow_vector, dtype=float).reshape(1, -1)
+        prediction = self.model.predict(features)[0]
+        label = _normalise_prediction_output(prediction)
+
+        confidence = 0.65
+        if hasattr(self.model, "decision_function"):
+            try:
+                scores = self.model.decision_function(features)
+                score_array = np.asarray(scores)
+                confidence = float(1.0 / (1.0 + np.exp(-np.max(score_array))))
+            except Exception:
+                pass
+        elif hasattr(self.model, "predict_proba"):
+            try:
+                probabilities = self.model.predict_proba(features)[0]
+                confidence = float(np.max(probabilities))
+                if hasattr(self.model, "classes_"):
+                    class_index = int(np.argmax(probabilities))
+                    label = _normalise_prediction_output(
+                        self.model.classes_[class_index]
+                    )
+            except Exception:
+                pass
+
+        va = _label_to_va(label, self.emot_states_areas)
+        return {
+            "valence": va["valence"],
+            "arousal": va["arousal"],
+            "label": label,
+            "confidence": confidence,
+        }
+
+
+class RFClassifierAdapter(BaseClassifier):
+    name = "random_forest"
+
+    def __init__(
+        self,
+        pow_columns: list,
+        emot_states_areas: list,
+        model_path: Optional[str] = None,
+        hyperparams: Optional[dict] = None,
+    ):
+        self.pow_columns = pow_columns
+        self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
+        self.model = None
+        self.hyperparams = hyperparams or {}
+        self.model_path = model_path
+        if model_path:
+            self.load_model(model_path)
+
+    def load_model(self, model_path: Optional[str] = None):
+        self.model_path = model_path or self.model_path
+        if not self.model_path:
+            return None
+        if joblib is None:
+            raise ImportError("joblib is required to load sklearn models")
+
+        loaded = joblib.load(self.model_path)
+        self.model = (
+            loaded.get("model")
+            if isinstance(loaded, dict) and "model" in loaded
+            else loaded
+        )
+        return self.model
+
+    def predict(self, pow_vector: List[float]) -> Dict:
+        if self.model is None:
+            raise RuntimeError("Random Forest model is not loaded")
+
+        features = np.asarray(pow_vector, dtype=float).reshape(1, -1)
+        prediction = self.model.predict(features)[0]
+        label = _normalise_prediction_output(prediction)
+
+        confidence = 0.65
+        if hasattr(self.model, "predict_proba"):
+            try:
+                probabilities = self.model.predict_proba(features)[0]
+                confidence = float(np.max(probabilities))
+                if hasattr(self.model, "classes_"):
+                    class_index = int(np.argmax(probabilities))
+                    label = _normalise_prediction_output(
+                        self.model.classes_[class_index]
+                    )
+            except Exception:
+                pass
+
+        va = _label_to_va(label, self.emot_states_areas)
+        return {
+            "valence": va["valence"],
+            "arousal": va["arousal"],
+            "label": label,
+            "confidence": confidence,
+        }
+
+
+class ClassifierManager:
+    """Registry + selector for classifier implementations.
+
+    Usage:
+        mgr = ClassifierManager(pow_columns, emot_states_areas)
+        mgr.register('va_stub', KNNClassifier)
+        mgr.select('va_stub', **kwargs)
+        out = mgr.predict(vec)
+    """
+
+    _registry: Dict[str, Type[BaseClassifier]] = {}
+
+    def __init__(self, pow_columns: list, emot_states_areas: list):
+        self.pow_columns = pow_columns
+        self.emot_states_areas = emot_states_areas
+        self.active: Optional[BaseClassifier] = None
+
+        # Register built-ins
+        self.register(KNNClassifierAdapter.name, KNNClassifierAdapter)
+        self.register(SVMClassifierAdapter.name, SVMClassifierAdapter)
+        self.register(RFClassifierAdapter.name, RFClassifierAdapter)
+
+    @classmethod
+    def register(cls, name: str, impl: Type[BaseClassifier]):
+        cls._registry[name] = impl
+
+    def select(
+        self,
+        name: str,
+        model_path: Optional[str] = None,
+        hyperparams: Optional[dict] = None,
+        **kwargs,
+    ):
+        impl = self._registry.get(name)
+        if impl is None:
+            raise ValueError(f"Classifier '{name}' not registered")
+
+        self.active = impl(
+            self.pow_columns,
+            self.emot_states_areas,
+            model_path=model_path,
+            hyperparams=hyperparams or {},
+            **kwargs,
+        )
+        # allow loading model if provided
+        if model_path:
+            try:
+                self.active.load_model(model_path)
+            except Exception:
+                pass
+        return self.active
+
+    def predict(self, pow_vector: List[float]) -> Dict:
+        if not self.active:
+            raise RuntimeError("No classifier selected")
+        return self.active.predict(pow_vector)
 
     def batch_predict(self, pow_vectors: List[List[float]]) -> List[Dict]:
-        """Predict on a batch of power vectors."""
-        return [self.predict(vec) for vec in pow_vectors]
+        if not self.active:
+            raise RuntimeError("No classifier selected")
+        return self.active.batch_predict(pow_vectors)
+
+
+__all__ = ["BaseClassifier", "ClassifierManager"]

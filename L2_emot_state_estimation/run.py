@@ -16,7 +16,7 @@ import pyarrow.feather as feather
 import pandas as pd
 
 from featureSelection import FeatureSelector
-from classifier import VAClassifier
+from classifier import ClassifierManager
 from consumer import QueueConsumer, CSVConsumer
 
 # Add parent directory to path to import config_loader
@@ -25,7 +25,13 @@ from config_loader import get_config
 
 
 def run_feather_mode(
-    feather_path: str, pow_columns: list, output_dir: str, emotional_states_areas: list
+    feather_path: str,
+    pow_columns: list,
+    output_dir: str,
+    emotional_states_areas: list,
+    classifier: str,
+    classifier_hyperparameters: dict,
+    num_classes: int,
 ):
     """
     Process from Feather file (DREAMER).
@@ -34,14 +40,22 @@ def run_feather_mode(
         feather_path: Path to L1 output Feather file
         pow_columns: List of column names for power features in the Feather file
         output_dir: Directory to save L2 predictions CSV
+        emotional_states_areas: List of dicts defining emotional state areas in VA space
+        classifier: Classifier type (e.g., "stub", "svm", "nn")
+        classifier_hyperparameters: Hyperparameters for the classifier (dict)
+        num_classes: Number of emotion classes to predict
     """
     print(f"Running L2 in Feather mode: {feather_path}")
 
-    # Initialize classifier and consumer
-    classifier = VAClassifier(pow_columns, emotional_states_areas)
+    # Initialize classifier
+    classifier = ClassifierManager(pow_columns, emotional_states_areas)
+    classifier.select(
+        classifier,
+        model_path=None,
+        hyperparams=classifier_hyperparameters,
+    )
 
     # Load Feather file (DREAMER format)
-
     df = feather.read_feather(feather_path)
     df = df.head(20)
 
@@ -91,7 +105,8 @@ def run_csv_mode(csv_path: str, output_csv: str = None):
     print(f"Running L2 in CSV mode: {csv_path}")
 
     # Initialize classifier and consumer
-    classifier = VAClassifier()
+    classifier = ClassifierManager(pow_columns=[], emotional_states_areas=[])
+    classifier.select("stub", model_path=None, hyperparams={})
     consumer = CSVConsumer(csv_path)
 
     # Get rows with metadata
@@ -149,7 +164,8 @@ def run_queue_mode(l1_queue, duration_sec: int = 10, output_json: str = None):
     print(f"Running L2 in queue mode for {duration_sec} seconds...")
 
     # Initialize classifier and consumer
-    classifier = VAClassifier()
+    classifier = ClassifierManager(pow_columns=[], emotional_states_areas=[])
+    classifier.select("stub", model_path=None, hyperparams={})
     consumer = QueueConsumer(l1_queue, timeout=0.5)
 
     predictions = []
@@ -197,6 +213,9 @@ if __name__ == "__main__":
             "POW_COLUMNS",
             "l2_output_folder",
             "emotional_states_areas",
+            "classifier",
+            "classifier_hyperparameters",
+            "num_classes",
         ]
     )
 
@@ -206,6 +225,9 @@ if __name__ == "__main__":
         config["POW_COLUMNS"],
         config["l2_output_folder"],
         config["emotional_states_areas"],
+        config["classifier"],
+        config["classifier_hyperparameters"],
+        config["num_classes"],
     )
 
     # Run in CSV mode (L1 output CSV)
