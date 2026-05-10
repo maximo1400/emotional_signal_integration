@@ -53,6 +53,7 @@ def run_feather_mode(
         classifier,
         model_path=None,
         hyperparams=classifier_hyperparameters,
+        num_classes=num_classes,
     )
 
     # Load Feather file (DREAMER format)

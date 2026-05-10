@@ -10,11 +10,11 @@ This module provides:
 
 import abc
 import numpy as np
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Type
 import joblib
 
 
-def _reshape_va_ranges(emot_states_areas) -> Dict:
+def _reshape_va_ranges(emot_states_areas: list[dict]) -> Dict:
     """
     Convert input emotional state areas into the canonical mapping:
     { "label": {"valence": (min, max), "arousal": (min, max)} }
@@ -70,7 +70,7 @@ class BaseClassifier(abc.ABC):
     def batch_predict(self, pow_vectors: List[List[float]]) -> List[Dict]:
         return [self.predict(v) for v in pow_vectors]
 
-    def load_model(self, model_path: Optional[str] = None):
+    def load_model(self, model_path: str = None):
         """Optional model loading hook for adapters."""
         return None
 
@@ -83,18 +83,20 @@ class KNNClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
-        model_path: Optional[str] = None,
-        hyperparams: Optional[dict] = None,
+        model_path: str = None,
+        hyperparams: dict = None,
+        num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
         self.model = None
-        self.hyperparams = hyperparams or {}
+        self.hyperparams = hyperparams["knn"]
         self.model_path = model_path
+        self.num_classes = num_classes
         if model_path:
             self.load_model(model_path)
 
-    def load_model(self, model_path: Optional[str] = None):
+    def load_model(self, model_path: str = None):
         self.model_path = model_path or self.model_path
 
         loaded = joblib.load(self.model_path)
@@ -142,23 +144,23 @@ class SVMClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
-        model_path: Optional[str] = None,
-        hyperparams: Optional[dict] = None,
+        model_path: str = None,
+        hyperparams: dict = None,
+        num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
         self.model = None
-        self.hyperparams = hyperparams or {}
+        self.hyperparams = hyperparams["svm"]
         self.model_path = model_path
+        self.num_classes = num_classes
         if model_path:
             self.load_model(model_path)
 
-    def load_model(self, model_path: Optional[str] = None):
+    def load_model(self, model_path: str = None):
         self.model_path = model_path or self.model_path
         if not self.model_path:
             return None
-        if joblib is None:
-            raise ImportError("joblib is required to load sklearn models")
 
         loaded = joblib.load(self.model_path)
         self.model = (
@@ -212,18 +214,20 @@ class RFClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
-        model_path: Optional[str] = None,
-        hyperparams: Optional[dict] = None,
+        model_path: str = None,
+        hyperparams: dict = None,
+        num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
         self.model = None
-        self.hyperparams = hyperparams or {}
+        self.hyperparams = hyperparams["random_forest"]
         self.model_path = model_path
+        self.num_classes = num_classes
         if model_path:
             self.load_model(model_path)
 
-    def load_model(self, model_path: Optional[str] = None):
+    def load_model(self, model_path: str = None):
         self.model_path = model_path or self.model_path
         if not self.model_path:
             return None
@@ -283,7 +287,7 @@ class ClassifierManager:
     def __init__(self, pow_columns: list, emot_states_areas: list):
         self.pow_columns = pow_columns
         self.emot_states_areas = emot_states_areas
-        self.active: Optional[BaseClassifier] = None
+        self.active: BaseClassifier = None
 
         # Register built-ins
         self.register(KNNClassifierAdapter.name, KNNClassifierAdapter)
@@ -297,8 +301,9 @@ class ClassifierManager:
     def select(
         self,
         name: str,
-        model_path: Optional[str] = None,
-        hyperparams: Optional[dict] = None,
+        model_path: str = None,
+        hyperparams: dict = None,
+        num_classes: int = None,
         **kwargs,
     ):
         impl = self._registry.get(name)
@@ -310,6 +315,7 @@ class ClassifierManager:
             self.emot_states_areas,
             model_path=model_path,
             hyperparams=hyperparams or {},
+            num_classes=num_classes,
             **kwargs,
         )
         # allow loading model if provided
