@@ -182,6 +182,13 @@ features_to_add: []  # List of additional features to add (e.g., ["hjorth_mobili
 # Classifier
 # Options: "random_forest", "svm", "knn"
 classifier: "random_forest"  # Classifier to use for emotion state estimation in Layer 2
+# Folder path to save the trained models from Layer 2. Each model will be saved with the corresponding name specified in models_names.
+models_folder: "L2_emot_state_estimation/Models"  # Folder path to save trained models from Layer 2
+models_names:  # Names for the saved models, used to identify them in the Models folder. Should match the classifier names.
+  random_forest: "random_forest.joblib"
+  svm: "svm.joblib"
+  knn: "knn.joblib"
+  
 # Hyperparameters for the classifiers
 classifier_hyperparameters:
   random_forest:

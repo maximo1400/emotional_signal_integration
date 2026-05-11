@@ -13,6 +13,10 @@ import numpy as np
 from typing import Dict, List, Type
 import joblib
 
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+
 
 def _reshape_va_ranges(emot_states_areas: list[dict]) -> Dict:
     """
@@ -22,7 +26,6 @@ def _reshape_va_ranges(emot_states_areas: list[dict]) -> Dict:
     """
 
     reshaped = {}
-    # list-of-dicts format
     for item in emot_states_areas:
         label = item["label"]
         # id = item["id"]
@@ -64,6 +67,10 @@ class BaseClassifier(abc.ABC):
     name: str = "base"
 
     @abc.abstractmethod
+    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     def predict(self, pow_vector: List[float]) -> Dict:
         raise NotImplementedError()
 
@@ -74,6 +81,19 @@ class BaseClassifier(abc.ABC):
         """Optional model loading hook for adapters."""
         return None
 
+    def save_model(self, model_path: str):
+        joblib.dump(
+            {
+                "model": self.model,
+                "classifier": self.name,
+                "pow_columns": getattr(self, "pow_columns", None),
+                "hyperparams": getattr(self, "hyperparams", None),
+                "num_classes": getattr(self, "num_classes", None),
+            },
+            model_path,
+        )
+        return model_path
+
 
 # Adapter skeletons for external model wrappers
 class KNNClassifierAdapter(BaseClassifier):
@@ -83,18 +103,27 @@ class KNNClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
+        label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
+        if label_va_lookup:
+            self.emot_states_areas.update(label_va_lookup)
         self.model = None
         self.hyperparams = hyperparams["knn"]
         self.model_path = model_path
         self.num_classes = num_classes
         if model_path:
             self.load_model(model_path)
+
+    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
+
+        self.model = KNeighborsClassifier(**self.hyperparams)
+        self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
+        return self.model
 
     def load_model(self, model_path: str = None):
         self.model_path = model_path or self.model_path
@@ -144,18 +173,29 @@ class SVMClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
+        label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
+        if label_va_lookup:
+            self.emot_states_areas.update(label_va_lookup)
         self.model = None
-        self.hyperparams = hyperparams["svm"]
+        self.hyperparams = (hyperparams or {}).get("svm", {})
         self.model_path = model_path
         self.num_classes = num_classes
         if model_path:
             self.load_model(model_path)
+
+    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
+
+        fit_params = dict(self.hyperparams)
+        fit_params.setdefault("probability", True)
+        self.model = SVC(**fit_params)
+        self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
+        return self.model
 
     def load_model(self, model_path: str = None):
         self.model_path = model_path or self.model_path
@@ -214,18 +254,27 @@ class RFClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
+        label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
+        if label_va_lookup:
+            self.emot_states_areas.update(label_va_lookup)
         self.model = None
         self.hyperparams = hyperparams["random_forest"]
         self.model_path = model_path
         self.num_classes = num_classes
         if model_path:
             self.load_model(model_path)
+
+    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
+
+        self.model = RandomForestClassifier(**self.hyperparams)
+        self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
+        return self.model
 
     def load_model(self, model_path: str = None):
         self.model_path = model_path or self.model_path
@@ -304,6 +353,7 @@ class ClassifierManager:
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
+        label_va_lookup: dict = None,
         **kwargs,
     ):
         impl = self._registry.get(name)
@@ -313,6 +363,7 @@ class ClassifierManager:
         self.active = impl(
             self.pow_columns,
             self.emot_states_areas,
+            label_va_lookup=label_va_lookup,
             model_path=model_path,
             hyperparams=hyperparams or {},
             num_classes=num_classes,
@@ -324,6 +375,35 @@ class ClassifierManager:
                 self.active.load_model(model_path)
             except Exception:
                 pass
+        return self.active
+
+    def train(
+        self,
+        name: str,
+        pow_vectors: List[List[float]],
+        labels: List[str],
+        model_path: str = None,
+        hyperparams: dict = None,
+        num_classes: int = None,
+        label_va_lookup: dict = None,
+        **kwargs,
+    ):
+        impl = self._registry.get(name)
+        if impl is None:
+            raise ValueError(f"Classifier '{name}' not registered")
+
+        self.active = impl(
+            self.pow_columns,
+            self.emot_states_areas,
+            label_va_lookup=label_va_lookup,
+            model_path=None,
+            hyperparams=hyperparams or {},
+            num_classes=num_classes,
+            **kwargs,
+        )
+        self.active.fit(pow_vectors, labels)
+        if model_path:
+            self.active.save_model(model_path)
         return self.active
 
     def predict(self, pow_vector: List[float]) -> Dict:

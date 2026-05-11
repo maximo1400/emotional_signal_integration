@@ -71,6 +71,9 @@ python main.py
 	- A lightweight scikit-learn model or a small neural net that uses a short temporal window.
 	- Output payload: `{source, sub_id, timestamp, valence, arousal, label, confidence}`.
 
+- `L2_emot_state_estimation/run.py` can now train a fresh classifier from labeled Feather data when no `--model-path` is provided, and it saves the fitted model next to the prediction outputs by default.
+- To reuse an existing model, pass `--model-path /path/to/classifier.joblib`.
+
 - Socket transport options being explored:
 	- TCP with newline-delimited JSON (simple, cross-language).
 	- WebSocket (if browser/HTTP clients required).
