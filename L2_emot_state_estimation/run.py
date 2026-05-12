@@ -115,7 +115,7 @@ def train_model(
     df = df.head(20)
     pow_data, labels = _collect_pow_features(df, pow_columns, num_classes)
 
-    classifier_manager = ClassifierManager(pow_columns, emotional_states_areas)
+    classifier_manager = ClassifierManager(pow_columns)
 
     model_path = f"{model_folder}/{models_names[classifier]}"
 

@@ -20,41 +20,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 
 
-def _reshape_va_ranges(emot_states_areas: list[dict]) -> Dict:
-    """
-    Convert input emotional state areas into the canonical mapping:
-    { "label": {"valence": (min, max), "arousal": (min, max)} }
-
-    """
-
-    reshaped = {}
-    for item in emot_states_areas:
-        label = item["label"]
-        # id = item["id"]
-        va_ranges = item["range"]
-        val_min = va_ranges["valence_min"]
-        val_max = va_ranges["valence_max"]
-        ar_min = va_ranges["arousal_min"]
-        ar_max = va_ranges["arousal_max"]
-        reshaped[label] = {
-            "valence": (val_min, val_max),
-            "arousal": (ar_min, ar_max),
-        }
-    return reshaped
-
-
-def _label_to_va(label: str, emot_states_areas: Dict) -> Dict:
-    """Convert an emotion label into a representative VA point."""
-    ranges = emot_states_areas.get(label)
-
-    valence = ranges["valence"]
-    arousal = ranges["arousal"]
-    return {
-        "valence": float((valence[0] + valence[1]) / 2),
-        "arousal": float((arousal[0] + arousal[1]) / 2),
-    }
-
-
 def _normalise_prediction_output(prediction) -> str:
     """Convert sklearn outputs to a stable label string."""
     if isinstance(prediction, np.ndarray):
@@ -89,7 +54,6 @@ class BaseClassifier(abc.ABC):
             {
                 "model": self.model,
                 "classifier": self.name,
-                "pow_columns": getattr(self, "pow_columns", None),
                 "hyperparams": getattr(self, "hyperparams", None),
                 "num_classes": getattr(self, "num_classes", None),
             },
@@ -104,17 +68,10 @@ class KNNClassifierAdapter(BaseClassifier):
 
     def __init__(
         self,
-        pow_columns: list,
-        emot_states_areas: list,
-        # label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
-        self.pow_columns = pow_columns
-        self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
-        # if label_va_lookup:
-        #     self.emot_states_areas.update(label_va_lookup)
         self.model = None
         self.hyperparams = hyperparams["knn"]
         self.model_path = model_path
@@ -160,10 +117,7 @@ class KNNClassifierAdapter(BaseClassifier):
             except Exception:
                 pass
 
-        va = _label_to_va(label, self.emot_states_areas)
         return {
-            "valence": va["valence"],
-            "arousal": va["arousal"],
             "label": label,
             "confidence": confidence,
         }
@@ -174,17 +128,10 @@ class SVMClassifierAdapter(BaseClassifier):
 
     def __init__(
         self,
-        pow_columns: list,
-        emot_states_areas: list,
-        # label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
-        self.pow_columns = pow_columns
-        self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
-        # if label_va_lookup:
-        #     self.emot_states_areas.update(label_va_lookup)
         self.model = None
         self.hyperparams = hyperparams["svm"]
         self.model_path = model_path
@@ -241,10 +188,7 @@ class SVMClassifierAdapter(BaseClassifier):
             except Exception:
                 pass
 
-        va = _label_to_va(label, self.emot_states_areas)
         return {
-            "valence": va["valence"],
-            "arousal": va["arousal"],
             "label": label,
             "confidence": confidence,
         }
@@ -255,17 +199,10 @@ class RFClassifierAdapter(BaseClassifier):
 
     def __init__(
         self,
-        pow_columns: list,
-        emot_states_areas: list,
-        # label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
-        self.pow_columns = pow_columns
-        self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
-        # if label_va_lookup:
-        #     self.emot_states_areas.update(label_va_lookup)
         self.model = None
         self.hyperparams = hyperparams["random_forest"]
         self.model_path = model_path
@@ -283,8 +220,6 @@ class RFClassifierAdapter(BaseClassifier):
         self.model_path = model_path or self.model_path
         if not self.model_path:
             return None
-        if joblib is None:
-            raise ImportError("joblib is required to load sklearn models")
 
         loaded = joblib.load(self.model_path)
         self.model = (
@@ -315,10 +250,7 @@ class RFClassifierAdapter(BaseClassifier):
             except Exception:
                 pass
 
-        va = _label_to_va(label, self.emot_states_areas)
         return {
-            "valence": va["valence"],
-            "arousal": va["arousal"],
             "label": label,
             "confidence": confidence,
         }
@@ -328,7 +260,6 @@ class ClassifierManager:
     """Registry + selector for classifier implementations.
 
     Usage:
-        mgr = ClassifierManager(pow_columns, emot_states_areas)
         mgr.register('va_stub', KNNClassifier)
         mgr.select('va_stub', **kwargs)
         out = mgr.predict(vec)
@@ -336,9 +267,7 @@ class ClassifierManager:
 
     _registry: Dict[str, Type[BaseClassifier]] = {}
 
-    def __init__(self, pow_columns: list, emot_states_areas: list):
-        self.pow_columns = pow_columns
-        self.emot_states_areas = emot_states_areas
+    def __init__(self):
         self.active: BaseClassifier = None
 
         # Register built-ins
@@ -356,7 +285,6 @@ class ClassifierManager:
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
-        # label_va_lookup: dict = None,
         **kwargs,
     ):
         impl = self._registry.get(name)
@@ -364,11 +292,8 @@ class ClassifierManager:
             raise ValueError(f"Classifier '{name}' not registered")
 
         self.active = impl(
-            self.pow_columns,
-            self.emot_states_areas,
-            # label_va_lookup=label_va_lookup,
             model_path=model_path,
-            hyperparams=hyperparams or {},
+            hyperparams=hyperparams,
             num_classes=num_classes,
             **kwargs,
         )
@@ -388,7 +313,6 @@ class ClassifierManager:
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
-        # label_va_lookup: dict = None,
         **kwargs,
     ):
         impl = self._registry.get(name)
@@ -396,9 +320,6 @@ class ClassifierManager:
             raise ValueError(f"Classifier '{name}' not registered")
 
         self.active = impl(
-            self.pow_columns,
-            self.emot_states_areas,
-            # label_va_lookup=label_va_lookup,
             model_path=None,
             hyperparams=hyperparams or {},
             num_classes=num_classes,
