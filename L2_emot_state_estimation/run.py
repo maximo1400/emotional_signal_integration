@@ -112,10 +112,11 @@ def train_model(
     run_output_dir.mkdir(parents=True, exist_ok=True)
 
     df = feather.read_feather(feather_path)
-    df = df.head(20)
+    # df = df.head(20)
     pow_data, labels = _collect_pow_features(df, pow_columns, num_classes)
+    classifier_input_len = len(pow_data[0])
 
-    classifier_manager = ClassifierManager(pow_columns)
+    classifier_manager = ClassifierManager(classifier_input_len)
 
     model_path = f"{model_folder}/{models_names[classifier]}"
 
@@ -126,7 +127,6 @@ def train_model(
             model_path=model_path,
             hyperparams=classifier_hyperparameters,
             num_classes=num_classes,
-            # label_va_lookup=label_va_lookup,
         )
 
         # Inspect saved model metadata and warn on mismatches with current inputs/outputs
@@ -148,7 +148,6 @@ def train_model(
             model_path=model_path,
             hyperparams=classifier_hyperparameters,
             num_classes=num_classes,
-            # label_va_lookup=label_va_lookup,
         )
 
 

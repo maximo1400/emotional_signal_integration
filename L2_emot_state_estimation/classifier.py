@@ -12,6 +12,7 @@ Prediction API:
 """
 
 import abc
+from pathlib import Path
 from typing import Dict, List, Type
 
 import joblib
@@ -42,11 +43,13 @@ class BaseClassifier(abc.ABC):
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
+        input_len: int = None,
     ):
         self.model = None
         self.model_path = model_path
         self.hyperparams = hyperparams
         self.num_classes = num_classes
+        self.input_len = input_len
 
         if model_path:
             self.load_model(model_path)
@@ -82,15 +85,18 @@ class BaseClassifier(abc.ABC):
             if isinstance(loaded, dict) and "model" in loaded
             else loaded
         )
+
         return self.model
 
     def save_model(self, model_path: str):
+        Path(model_path).parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(
             {
                 "model": self.model,
                 "classifier": self.name,
                 "hyperparams": self.hyperparams,
                 "num_classes": self.num_classes,
+                "input_len": self.input_len,
             },
             model_path,
         )
@@ -108,11 +114,13 @@ class KNNClassifierAdapter(BaseClassifier):
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
+        input_len: int = None,
     ):
         super().__init__(
             model_path=model_path,
             hyperparams=hyperparams["knn"],
             num_classes=num_classes,
+            input_len=input_len,
         )
 
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
@@ -158,11 +166,13 @@ class SVMClassifierAdapter(BaseClassifier):
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
+        input_len: int = None,
     ):
         super().__init__(
             model_path=model_path,
             hyperparams=hyperparams["svm"],
             num_classes=num_classes,
+            input_len=input_len,
         )
 
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
@@ -215,11 +225,13 @@ class RFClassifierAdapter(BaseClassifier):
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
+        input_len: int = None,
     ):
         super().__init__(
             model_path=model_path,
             hyperparams=hyperparams["random_forest"],
             num_classes=num_classes,
+            input_len=input_len,
         )
 
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
@@ -262,7 +274,8 @@ class ClassifierManager:
 
     _registry: Dict[str, Type[BaseClassifier]] = {}
 
-    def __init__(self):
+    def __init__(self, input_len: int):
+        self.input_len = input_len
         self.active: BaseClassifier = None
 
         self.register(KNNClassifierAdapter.name, KNNClassifierAdapter)
@@ -289,6 +302,7 @@ class ClassifierManager:
             model_path=model_path,
             hyperparams=hyperparams or {},
             num_classes=num_classes,
+            input_len=self.input_len,
             **kwargs,
         )
         return self.active
@@ -314,6 +328,7 @@ class ClassifierManager:
             model_path=None,
             hyperparams=hyperparams or {},
             num_classes=num_classes,
+            input_len=self.input_len,
             **kwargs,
         )
 
