@@ -7,11 +7,13 @@ Modes:
 3. csv_mode: Process L1 output CSV (batch)
 """
 
+import os
 import sys
 import time
 from pathlib import Path
 import pyarrow.feather as feather
 import pandas as pd
+
 
 from featureSelection import FeatureSelector
 from classifier import ClassifierManager
@@ -21,30 +23,37 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_loader import get_config
 
 
-def _compress_va_range(list, num_classes):
+def _set_va_range(values: list[int], num_classes: int) -> list[int]:
     """Compress valence/arousal values to fit the number of classes.
-    DREAMER has valence/arousal in [1, 5].
-    Tries to mantain center values and compress/expand the range accordingly
+
+    DREAMER valence/arousal are on a 1..5 scale. This maps that source scale
+    into `num_classes` bins while keeping the midpoint stable for num_classes = 3.
+
+    returns a list of integers in the range [0, num_classes-1] representing the compressed class indices.
     """
     if num_classes == 1:
-        return [1 for x in list]
-    elif num_classes == 3:
-        return [2 if x == 3 else (1 if x < 3 else 3) for x in list]
-    elif num_classes == 5:
-        return list
-    else:
-        raise ValueError(
-            "num_classes not implemented, need to implement compression/expansion logic for the given number of classes"
-        )
+        return [0] * len(values)
+
+    if num_classes == 5:
+        return [value - 1 for value in values]
+
+    mapped_values = []
+    for value in values:
+        # Map the 1..5 range to 0..(num_classes-1) while the midpoint stays stable for  num_classes = 3
+        class_index = round((float(value) - 1) * (num_classes - 1) / 4)
+        class_index = max(0, min(num_classes - 1, class_index))
+        mapped_values.append(class_index)
+
+    return mapped_values
 
 
-def _define_label_va(val: list, ar: list):
+def _va_to_label(val: list, ar: list) -> list[str]:
     """Define the emotion label based on valence and arousal values and the defined emotional state areas."""
-    max_label = max(max(val), max(ar))
-    min_label = min(min(val), min(ar))
-    labels_int = []
     labels_str = []
-    i = 0
+    for v, a in zip(val, ar):
+        label = f"{v}_{a}"
+        labels_str.append(label)
+    return labels_str
 
 
 def _collect_pow_features(
@@ -58,41 +67,18 @@ def _collect_pow_features(
     """Extract processed power features and emotion labels from a labeled dataframe."""
 
     feat_select = FeatureSelector()
+
+    valence = _set_va_range(list(df["valence"]), num_classes)
+    arousal = _set_va_range(list(df["arousal"]), num_classes)
+    labels = _va_to_label(valence, arousal)
+
     pow_vectors = []
-    labels = []
-    label_va_samples = {}
+    df_pow = df.reindex(columns=pow_columns)
+    for i, row in df_pow.iterrows():
+        pow_vector = feat_select.process_data(row.tolist())
+        pow_vectors.append(pow_vector)
 
-    valence = list(df["valence"])
-    arousal = list(df["arousal"])
-    valence = _compress_va_range(valence, num_classes)
-    arousal = _compress_va_range(arousal, num_classes)
-
-    pow_df = df[pow_columns]
-
-    for _, row in df.iterrows():
-        label = row.get("emot_state")
-        if pd.isna(label):
-            continue
-
-        label = str(label)
-        pow_vector = [row[col] for col in pow_columns]
-        processed_vector = feat_select.process_data(pow_vector)
-        pow_vectors.append(processed_vector)
-        labels.append(label)
-        label_va_samples.setdefault(label, []).append(
-            (float(row["valence"]), float(row["arousal"]))
-        )
-
-    label_va_lookup = {}
-    for label, samples in label_va_samples.items():
-        valence_mean = float(sum(sample[0] for sample in samples) / len(samples))
-        arousal_mean = float(sum(sample[1] for sample in samples) / len(samples))
-        label_va_lookup[label] = {
-            "valence": (valence_mean, valence_mean),
-            "arousal": (arousal_mean, arousal_mean),
-        }
-
-    return pow_vectors, labels, feat_select, label_va_lookup
+    return pow_vectors, labels
 
 
 def train_model(
@@ -103,7 +89,7 @@ def train_model(
     classifier: str,
     classifier_hyperparameters: dict,
     num_classes: int,
-    model_path: str = None,
+    model_folder: str = None,
     models_names: dict[str, str] = None,
     # save_model_path: str = None,
 ):
@@ -112,7 +98,7 @@ def train_model(
 
     Args:
         feather_path: Path to L1 output Feather file
-        pow_columns: List of column names for power features in the Feather file
+        pow_columns: List of column names for power band features in the Feather file
         output_dir: Directory to save L2 predictions CSV
         emotional_states_areas: List of dicts defining emotional state areas in VA space
         classifier: Classifier type (e.g., "stub", "svm", "nn")
@@ -126,68 +112,76 @@ def train_model(
     run_output_dir.mkdir(parents=True, exist_ok=True)
 
     df = feather.read_feather(feather_path)
-
-    train_vectors, train_labels, _, label_va_lookup = _collect_pow_features(
-        df, pow_columns
-    )
-
-    if not train_vectors:
-        raise RuntimeError("No labeled rows were found for classifier training")
+    df = df.head(20)
+    pow_data, labels = _collect_pow_features(df, pow_columns, num_classes)
 
     classifier_manager = ClassifierManager(pow_columns, emotional_states_areas)
-    if model_path:
+
+    model_path = f"{model_folder}/{models_names[classifier]}"
+
+    if os.path.exists(model_path):
+        # Load/select existing model
         classifier_manager.select(
             classifier,
             model_path=model_path,
             hyperparams=classifier_hyperparameters,
             num_classes=num_classes,
-            label_va_lookup=label_va_lookup,
+            # label_va_lookup=label_va_lookup,
         )
+
+        # Inspect saved model metadata and warn on mismatches with current inputs/outputs
+        # TODO: Implement metadata saving and inspection in ClassifierManager
+        # loaded_metadata = classifier_manager.get_model_metadata(model_path)
+        # model_input_len = loaded_metadata["pow_columns"]
+        # model_num_classes = loaded_metadata["num_classes"]
+        # if model_input_len != len(pow_columns) or model_num_classes != num_classes:
+        #     warnings.warn(
+        #         f"Loaded model metadata mismatch: expected input length {model_input_len} and num_classes {model_num_classes}\
+        #               but got input length {len(pow_columns)} and num_classes {num_classes}. Predictions may be unreliable."
+        #     )
+
     else:
         classifier_manager.train(
             classifier,
-            train_vectors,
-            train_labels,
-            model_path=save_model_path,
+            pow_data,
+            labels,
+            model_path=model_path,
             hyperparams=classifier_hyperparameters,
             num_classes=num_classes,
-            label_va_lookup=label_va_lookup,
+            # label_va_lookup=label_va_lookup,
         )
 
-    predictions = []
-    predict_df = df.head(20)
-    feat_select = FeatureSelector()
 
-    for i, row in predict_df.iterrows():
-        pow_vector = [row[col] for col in pow_columns]
-        pow_vector = feat_select.process_data(pow_vector)
-        result = classifier_manager.predict(pow_vector)
+# def predict():
+#     for i, row in enumerate(train_vectors):
+#         pow_vector = row
+#         result = classifier_manager.predict(pow_vector)
 
-        pred_row = {
-            "index": i,
-            "true_valence": row["valence"],
-            "true_arousal": row["arousal"],
-            "pred_valence": result["valence"],
-            "pred_arousal": result["arousal"],
-            "pred_label": result["label"],
-            "confidence": result["confidence"],
-            "timestamp": time.time(),
-        }
-        predictions.append(pred_row)
+#         pred_row = {
+#             "index": i,
+#             "true_valence": row["valence"],
+#             "true_arousal": row["arousal"],
+#             "pred_valence": result["valence"],
+#             "pred_arousal": result["arousal"],
+#             "pred_label": result["label"],
+#             "confidence": result["confidence"],
+#             "timestamp": time.time(),
+#         }
+#         predictions.append(pred_row)
 
-    # Save predictions to CSV
-    df_pred = pd.DataFrame(predictions)
+#     # Save predictions to CSV
+#     df_pred = pd.DataFrame(predictions)
 
-    output_csv = run_output_dir / "predictions.csv"
-    features_csv = run_output_dir / "features.csv"
+#     output_csv = run_output_dir / "predictions.csv"
+#     features_csv = run_output_dir / "features.csv"
 
-    df_pred.to_csv(output_csv, index=False)
-    df_features = pd.DataFrame(feat_select.pow, columns=feat_select.labels)
-    df_features.to_csv(features_csv, index=False)
-    print(f"Predictions saved to {output_csv}")
-    print(f"Features saved to {features_csv}")
-    if not model_path:
-        print(f"Trained classifier saved to {save_model_path}")
+#     df_pred.to_csv(output_csv, index=False)
+#     df_features = pd.DataFrame(feat_select.pow, columns=feat_select.labels)
+#     df_features.to_csv(features_csv, index=False)
+#     print(f"Predictions saved to {output_csv}")
+#     print(f"Features saved to {features_csv}")
+#     if not model_folder:
+#         print(f"Trained classifier saved to {model_path}")
 
 
 if __name__ == "__main__":
@@ -198,6 +192,7 @@ if __name__ == "__main__":
             "l2_output_folder",
             "emotional_states_areas",
             "classifier",
+            "clasfier_mode",
             "classifier_hyperparameters",
             "num_classes",
             "models_folder",
@@ -206,14 +201,15 @@ if __name__ == "__main__":
     )
 
     # Run in Feather mode (DREAMER dataset)
-    train_model(
-        config["feather_file_path"],
-        config["POW_COLUMNS"],
-        config["l2_output_folder"],
-        config["emotional_states_areas"],
-        config["classifier"],
-        config["classifier_hyperparameters"],
-        config["num_classes"],
-        config["models_folder"],
-        config["models_names"],
-    )
+    if config["clasfier_mode"] == "train":
+        train_model(
+            config["feather_file_path"],
+            config["POW_COLUMNS"],
+            config["l2_output_folder"],
+            config["emotional_states_areas"],
+            config["classifier"],
+            config["classifier_hyperparameters"],
+            config["num_classes"],
+            config["models_folder"],
+            config["models_names"],
+        )

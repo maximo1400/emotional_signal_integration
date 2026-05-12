@@ -16,6 +16,8 @@ import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
 
 
 def _reshape_va_ranges(emot_states_areas: list[dict]) -> Dict:
@@ -29,10 +31,11 @@ def _reshape_va_ranges(emot_states_areas: list[dict]) -> Dict:
     for item in emot_states_areas:
         label = item["label"]
         # id = item["id"]
-        val_min = item["valence_min"]
-        val_max = item["valence_max"]
-        ar_min = item["arousal_min"]
-        ar_max = item["arousal_max"]
+        va_ranges = item["range"]
+        val_min = va_ranges["valence_min"]
+        val_max = va_ranges["valence_max"]
+        ar_min = va_ranges["arousal_min"]
+        ar_max = va_ranges["arousal_max"]
         reshaped[label] = {
             "valence": (val_min, val_max),
             "arousal": (ar_min, ar_max),
@@ -103,15 +106,15 @@ class KNNClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
-        label_va_lookup: dict = None,
+        # label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
-        if label_va_lookup:
-            self.emot_states_areas.update(label_va_lookup)
+        # if label_va_lookup:
+        #     self.emot_states_areas.update(label_va_lookup)
         self.model = None
         self.hyperparams = hyperparams["knn"]
         self.model_path = model_path
@@ -173,17 +176,17 @@ class SVMClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
-        label_va_lookup: dict = None,
+        # label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
-        if label_va_lookup:
-            self.emot_states_areas.update(label_va_lookup)
+        # if label_va_lookup:
+        #     self.emot_states_areas.update(label_va_lookup)
         self.model = None
-        self.hyperparams = (hyperparams or {}).get("svm", {})
+        self.hyperparams = hyperparams["svm"]
         self.model_path = model_path
         self.num_classes = num_classes
         if model_path:
@@ -254,15 +257,15 @@ class RFClassifierAdapter(BaseClassifier):
         self,
         pow_columns: list,
         emot_states_areas: list,
-        label_va_lookup: dict = None,
+        # label_va_lookup: dict = None,
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
     ):
         self.pow_columns = pow_columns
         self.emot_states_areas = _reshape_va_ranges(emot_states_areas)
-        if label_va_lookup:
-            self.emot_states_areas.update(label_va_lookup)
+        # if label_va_lookup:
+        #     self.emot_states_areas.update(label_va_lookup)
         self.model = None
         self.hyperparams = hyperparams["random_forest"]
         self.model_path = model_path
@@ -353,7 +356,7 @@ class ClassifierManager:
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
-        label_va_lookup: dict = None,
+        # label_va_lookup: dict = None,
         **kwargs,
     ):
         impl = self._registry.get(name)
@@ -363,7 +366,7 @@ class ClassifierManager:
         self.active = impl(
             self.pow_columns,
             self.emot_states_areas,
-            label_va_lookup=label_va_lookup,
+            # label_va_lookup=label_va_lookup,
             model_path=model_path,
             hyperparams=hyperparams or {},
             num_classes=num_classes,
@@ -385,7 +388,7 @@ class ClassifierManager:
         model_path: str = None,
         hyperparams: dict = None,
         num_classes: int = None,
-        label_va_lookup: dict = None,
+        # label_va_lookup: dict = None,
         **kwargs,
     ):
         impl = self._registry.get(name)
@@ -395,15 +398,23 @@ class ClassifierManager:
         self.active = impl(
             self.pow_columns,
             self.emot_states_areas,
-            label_va_lookup=label_va_lookup,
+            # label_va_lookup=label_va_lookup,
             model_path=None,
             hyperparams=hyperparams or {},
             num_classes=num_classes,
             **kwargs,
         )
-        self.active.fit(pow_vectors, labels)
+        # TODO: un-hardcode train/test split and stratification strategy
+        X_train, X_test, y_train, y_test = train_test_split(
+            pow_vectors, labels, test_size=0.2, random_state=42, stratify=labels
+        )
+        self.active.fit(X_train, y_train)
+        y_pred = self.active.predict(X_test)
+
         if model_path:
             self.active.save_model(model_path)
+        print("Accuracy:", accuracy_score(y_test, y_pred))
+        print(classification_report(y_test, y_pred))
         return self.active
 
     def predict(self, pow_vector: List[float]) -> Dict:
