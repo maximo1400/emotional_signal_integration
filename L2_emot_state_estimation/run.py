@@ -7,7 +7,6 @@ Modes:
 3. csv_mode: Process L1 output CSV (batch)
 """
 
-import os
 import sys
 import time
 from pathlib import Path
@@ -85,13 +84,12 @@ def train_model(
     feather_path: str,
     pow_columns: list,
     output_dir: str,
-    emotional_states_areas: list,
     classifier: str,
     classifier_hyperparameters: dict,
     num_classes: int,
-    model_folder: str = None,
-    models_names: dict[str, str] = None,
-    # save_model_path: str = None,
+    model_folder: str,
+    models_names: dict[str, str],
+    class_balancing: str,
 ):
     """
     Process from Feather file (DREAMER).
@@ -100,10 +98,10 @@ def train_model(
         feather_path: Path to L1 output Feather file
         pow_columns: List of column names for power band features in the Feather file
         output_dir: Directory to save L2 predictions CSV
-        emotional_states_areas: List of dicts defining emotional state areas in VA space
         classifier: Classifier type (e.g., "random_forest", "svm", "knn")
         classifier_hyperparameters: Hyperparameters for the classifier (dict)
         num_classes: Number of emotion classes to predict
+        class_balancing: Method for class balancing ("none", "undersample", "oversample")
     """
     print(f"Running L2 in Feather mode: {feather_path}")
 
@@ -113,7 +111,7 @@ def train_model(
 
     df = feather.read_feather(feather_path)
     # df = df.head(5000)
-    df = df[df["subject_id"] < 2]
+    # df = df[df["subject_id"] < 2]
     pow_data, labels = _collect_pow_features(df, pow_columns, num_classes)
     classifier_input_len = len(pow_data[0])
 
@@ -128,39 +126,8 @@ def train_model(
         model_path,
         classifier_hyperparameters,
         num_classes,
+        class_balancing,
     )
-
-
-# def predict():
-#     for i, row in enumerate(train_vectors):
-#         pow_vector = row
-#         result = classifier_manager.predict(pow_vector)
-
-#         pred_row = {
-#             "index": i,
-#             "true_valence": row["valence"],
-#             "true_arousal": row["arousal"],
-#             "pred_valence": result["valence"],
-#             "pred_arousal": result["arousal"],
-#             "pred_label": result["label"],
-#             "confidence": result["confidence"],
-#             "timestamp": time.time(),
-#         }
-#         predictions.append(pred_row)
-
-#     # Save predictions to CSV
-#     df_pred = pd.DataFrame(predictions)
-
-#     output_csv = run_output_dir / "predictions.csv"
-#     features_csv = run_output_dir / "features.csv"
-
-#     df_pred.to_csv(output_csv, index=False)
-#     df_features = pd.DataFrame(feat_select.pow, columns=feat_select.labels)
-#     df_features.to_csv(features_csv, index=False)
-#     print(f"Predictions saved to {output_csv}")
-#     print(f"Features saved to {features_csv}")
-#     if not model_folder:
-#         print(f"Trained classifier saved to {model_path}")
 
 
 if __name__ == "__main__":
@@ -169,13 +136,13 @@ if __name__ == "__main__":
             "feather_file_path",
             "POW_COLUMNS",
             "l2_output_folder",
-            "emotional_states_areas",
             "classifier",
             "clasfier_mode",
             "classifier_hyperparameters",
             "num_classes",
             "models_folder",
             "models_names",
+            "class_balancing",
         ]
     )
 
@@ -185,10 +152,10 @@ if __name__ == "__main__":
             config["feather_file_path"],
             config["POW_COLUMNS"],
             config["l2_output_folder"],
-            config["emotional_states_areas"],
             config["classifier"],
             config["classifier_hyperparameters"],
             config["num_classes"],
             config["models_folder"],
             config["models_names"],
+            config["class_balancing"],
         )

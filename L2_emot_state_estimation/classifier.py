@@ -35,6 +35,53 @@ def _normalise_prediction_output(prediction) -> str:
     return str(prediction)
 
 
+def _apply_class_balancing(
+    X_train: list, y_train: list, method: str, random_state: int = 42
+):
+    """Apply class balancing to the training data."""
+    if method == "none":
+        return X_train, y_train
+
+    elif method == "undersample":
+        X_train = np.asarray(X_train, dtype=object)
+        y_train = np.asarray(y_train)
+
+        classes, counts = np.unique(y_train, return_counts=True)
+        target_count = int(np.min(counts))
+        rng = np.random.default_rng(random_state)
+
+        sampled_indices = []
+        for class_label in classes:
+            class_indices = np.flatnonzero(y_train == class_label)
+            chosen_indices = rng.choice(class_indices, size=target_count, replace=False)
+            sampled_indices.extend(chosen_indices.tolist())
+
+        sampled_indices = rng.permutation(sampled_indices)
+        return X_train[sampled_indices].tolist(), y_train[sampled_indices].tolist()
+
+    elif method == "oversample":
+        X_train = np.asarray(X_train, dtype=object)
+        y_train = np.asarray(y_train)
+
+        classes, counts = np.unique(y_train, return_counts=True)
+        target_count = int(np.max(counts))
+        rng = np.random.default_rng(random_state)
+
+        sampled_indices = []
+        for class_label in classes:
+            class_indices = np.flatnonzero(y_train == class_label)
+            replace = len(class_indices) < target_count
+            chosen_indices = rng.choice(
+                class_indices, size=target_count, replace=replace
+            )
+            sampled_indices.extend(chosen_indices.tolist())
+
+        sampled_indices = rng.permutation(sampled_indices)
+        return X_train[sampled_indices].tolist(), y_train[sampled_indices].tolist()
+    else:
+        raise ValueError(f"Invalid class balancing method: {method}")
+
+
 class BaseClassifier(abc.ABC):
     """Abstract base for classifier implementations."""
 
@@ -89,9 +136,7 @@ class BaseClassifier(abc.ABC):
             if isinstance(loaded, dict) and "model" in loaded
             else loaded
         )
-        print(
-            f"Loaded model from {self.model_path} with metadata: {model_metadata}"
-        )
+        print(f"Loaded model from {self.model_path} with metadata: {model_metadata}")
         self.validate_model_metadata(model_metadata)
         return self.model
 
@@ -322,27 +367,6 @@ class ClassifierManager:
     def register(cls, name: str, impl: Type[BaseClassifier]):
         cls._registry[name] = impl
 
-    def select(
-        self,
-        name: str,
-        model_path: str = None,
-        hyperparams: dict = None,
-        num_classes: int = None,
-        **kwargs,
-    ):
-        impl = self._registry.get(name)
-        if impl is None:
-            raise ValueError(f"Classifier '{name}' not registered")
-
-        self.active = impl(
-            model_path=model_path,
-            hyperparams=hyperparams,
-            num_classes=num_classes,
-            input_len=self.input_len,
-            **kwargs,
-        )
-        return self.active
-
     def train(
         self,
         name: str,
@@ -351,6 +375,7 @@ class ClassifierManager:
         model_path: str,
         hyperparams: dict,
         num_classes: int,
+        class_balancing: str,
         test_size: float = 0.2,
         random_state: int = 42,
         stratify: bool = True,
@@ -377,6 +402,9 @@ class ClassifierManager:
             test_size=test_size,
             random_state=random_state,
             stratify=stratify_labels,
+        )
+        X_train, y_train = _apply_class_balancing(
+            X_train, y_train, method=class_balancing
         )
 
         self.active.fit(X_train, y_train)

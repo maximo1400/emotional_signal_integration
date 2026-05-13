@@ -205,9 +205,11 @@ classifier_hyperparameters:
     kernel: "rbf"
     C: 1.0
     gamma: "scale"
+    class_weight: "balanced"
+    random_state: 42
   knn:
     n_neighbors: 5
-    weights: "uniform"
+    weights: "distance"
     n_jobs: 6
 
 # Number of classes to predict. Same numer for both for valence and arousal.
@@ -218,6 +220,6 @@ num_classes: 3
 # Classification class balancing configuration
 # Options:
 # - "none": No class balancing, use the original class distribution from the dataset.
-# - "oversample": Oversample the minority classes by duplicating samples until all classes have
 # - "undersample": Undersample the majority classes by randomly removing samples until all classes have the same number of samples.
-class_balancing: "oversample"  # Class balancing method to use for training the classifier
+# - "oversample": Oversample the minority classes by randomly duplicating samples until all classes have the same number of samples.
+class_balancing: "undersample"  # Class balancing method to use for training the classifier
