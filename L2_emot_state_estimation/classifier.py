@@ -99,7 +99,7 @@ def _split_data(
 
     elif method == "subject":
         test_subjects = parameters["subject"]["test_subjects"]
-        X = np.asarray(X, dtype=object)
+        X = np.asarray(X, dtype=float)
         y = np.asarray(y)
         people = np.asarray(people)
 
@@ -107,6 +107,8 @@ def _split_data(
         X_train, X_test = X[~test_mask].tolist(), X[test_mask].tolist()
         y_train, y_test = y[~test_mask].tolist(), y[test_mask].tolist()
 
+        if len(test_subjects) == 0 or len(test_subjects) == len(np.unique(people)):
+            print("Warning: Check that 'test_subjects' are correctly specified.")
         return X_train, X_test, y_train, y_test
 
     else:
@@ -205,17 +207,17 @@ class BaseClassifier(abc.ABC):
         saved_classifier = metadata.get("classifier")
         saved_hyperparams = metadata.get("hyperparams")
 
-        if saved_input_len is not None and int(saved_input_len) != self.input_len:
+        if int(saved_input_len) != self.input_len:
             print(
                 f"Model input size mismatch: expected {self.input_len}, got {saved_input_len}"
             )
 
-        if saved_num_classes is not None and int(saved_num_classes) != self.num_classes:
+        if int(saved_num_classes) != self.num_classes:
             print(
                 f"Model output size mismatch: expected {self.num_classes}, got {saved_num_classes}"
             )
 
-        if saved_classifier is not None and saved_classifier != self.name:
+        if saved_classifier != self.name:
             print(
                 f"Model classifier mismatch: expected {self.name}, got {saved_classifier}"
             )
@@ -322,7 +324,11 @@ class RFClassifierAdapter(BaseClassifier):
 class ClassifierManager:
     """Registry + selector for classifier implementations."""
 
-    _registry: Dict[str, Type[BaseClassifier]] = {}
+    _registry = {
+        KNNClassifierAdapter.name: KNNClassifierAdapter,
+        SVMClassifierAdapter.name: SVMClassifierAdapter,
+        RFClassifierAdapter.name: RFClassifierAdapter,
+    }
 
     def __init__(self, input_len: int):
         self.input_len = input_len
