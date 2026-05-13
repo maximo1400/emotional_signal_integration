@@ -223,3 +223,14 @@ num_classes: 3
 # - "undersample": Undersample the majority classes by randomly removing samples until all classes have the same number of samples.
 # - "oversample": Oversample the minority classes by randomly duplicating samples until all classes have the same number of samples.
 class_balancing: "undersample"  # Class balancing method to use for training the classifier
+
+# Method to separate training and testing data. Options:
+# - "random": Randomly split the data into training and testing sets.
+# - "subject": Split the data by subject, using some subjects for training and others for testing. This is a more realistic evaluation method for emotion recognition models, as it tests the model's ability to generalize to new subjects.
+data_split_method: "subject"
+data_split_parameters:
+  random:
+    test_size: 0.2  # Proportion of the dataset to include in the test split (used if data_split_method is "random")
+    random_state: 42  # Random seed for reproducibility (used if data_split_method is "random")
+  subject:
+    test_subjects: [4]  # List of subject IDs to use for testing (used if data_split_method is "subject")

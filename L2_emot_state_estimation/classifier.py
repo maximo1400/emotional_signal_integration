@@ -82,6 +82,37 @@ def _apply_class_balancing(
         raise ValueError(f"Invalid class balancing method: {method}")
 
 
+def _split_data(
+    X: list, y: list, method: str, parameters: dict, people: List[int], stratify: bool
+) -> tuple[list, list, list, list]:
+    """Split data into train/test sets based on the specified method."""
+    if method == "random":
+        test_size = parameters["random"]["test_size"]
+        random_state = parameters["random"]["random_state"]
+        return train_test_split(
+            X,
+            y,
+            test_size=test_size,
+            random_state=random_state,
+            stratify=stratify,
+        )
+
+    elif method == "subject":
+        test_subjects = parameters["subject"]["test_subjects"]
+        X = np.asarray(X, dtype=object)
+        y = np.asarray(y)
+        people = np.asarray(people)
+
+        test_mask = np.isin(people, test_subjects)
+        X_train, X_test = X[~test_mask].tolist(), X[test_mask].tolist()
+        y_train, y_test = y[~test_mask].tolist(), y[test_mask].tolist()
+
+        return X_train, X_test, y_train, y_test
+
+    else:
+        raise ValueError(f"Invalid data split method: {method}")
+
+
 class BaseClassifier(abc.ABC):
     """Abstract base for classifier implementations."""
 
@@ -136,7 +167,7 @@ class BaseClassifier(abc.ABC):
             if isinstance(loaded, dict) and "model" in loaded
             else loaded
         )
-        print(f"Loaded model from {self.model_path} with metadata: {model_metadata}")
+        # print(f"Loaded model from {self.model_path} with metadata: {model_metadata}")
         self.validate_model_metadata(model_metadata)
         return self.model
 
@@ -376,8 +407,9 @@ class ClassifierManager:
         hyperparams: dict,
         num_classes: int,
         class_balancing: str,
-        test_size: float = 0.2,
-        random_state: int = 42,
+        data_split_method: str,
+        data_split_parameters: dict,
+        people: List[int],
         stratify: bool = True,
         **kwargs,
     ):
@@ -396,16 +428,20 @@ class ClassifierManager:
             self.active.validate_existing_model(model_path)
 
         stratify_labels = labels if stratify else None
-        X_train, X_test, y_train, y_test = train_test_split(
+
+        X_train, X_test, y_train, y_test = _split_data(
             pow_vectors,
             labels,
-            test_size=test_size,
-            random_state=random_state,
-            stratify=stratify_labels,
+            data_split_method,
+            data_split_parameters,
+            people,
+            stratify_labels,
         )
+        print(f"X_train size: {len(X_train)}, X_test size: {len(X_test)}")
         X_train, y_train = _apply_class_balancing(
             X_train, y_train, method=class_balancing
         )
+        print(f"X_train size: {len(X_train)}, X_test size: {len(X_test)}")
 
         self.active.fit(X_train, y_train)
         y_pred = self.active.batch_predict(X_test)

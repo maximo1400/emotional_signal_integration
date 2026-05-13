@@ -66,6 +66,7 @@ def _collect_pow_features(
     """Extract processed power features and emotion labels from a labeled dataframe."""
 
     feat_select = FeatureSelector()
+    people = df["subject_id"].to_list()
 
     valence = _set_va_range(list(df["valence"]), num_classes)
     arousal = _set_va_range(list(df["arousal"]), num_classes)
@@ -77,7 +78,7 @@ def _collect_pow_features(
         pow_vector = feat_select.process_data(row.tolist())
         pow_vectors.append(pow_vector)
 
-    return pow_vectors, labels
+    return pow_vectors, labels, people
 
 
 def train_model(
@@ -90,6 +91,8 @@ def train_model(
     model_folder: str,
     models_names: dict[str, str],
     class_balancing: str,
+    data_split_method: str,
+    data_split_parameters: dict,
 ):
     """
     Process from Feather file (DREAMER).
@@ -102,6 +105,8 @@ def train_model(
         classifier_hyperparameters: Hyperparameters for the classifier (dict)
         num_classes: Number of emotion classes to predict
         class_balancing: Method for class balancing ("none", "undersample", "oversample")
+        data_split_method: Method for splitting data into train/test ("random", "subject")
+        data_split_parameters: Parameters for the data splitting method (dict)
     """
     print(f"Running L2 in Feather mode: {feather_path}")
 
@@ -111,8 +116,8 @@ def train_model(
 
     df = feather.read_feather(feather_path)
     # df = df.head(5000)
-    # df = df[df["subject_id"] < 2]
-    pow_data, labels = _collect_pow_features(df, pow_columns, num_classes)
+    # df = df[df["subject_id"] < 5]
+    pow_data, labels, people = _collect_pow_features(df, pow_columns, num_classes)
     classifier_input_len = len(pow_data[0])
 
     classifier_manager = ClassifierManager(classifier_input_len)
@@ -127,6 +132,9 @@ def train_model(
         classifier_hyperparameters,
         num_classes,
         class_balancing,
+        data_split_method,
+        data_split_parameters,
+        people,
     )
 
 
@@ -143,6 +151,8 @@ if __name__ == "__main__":
             "models_folder",
             "models_names",
             "class_balancing",
+            "data_split_method",
+            "data_split_parameters",
         ]
     )
 
@@ -158,4 +168,6 @@ if __name__ == "__main__":
             config["models_folder"],
             config["models_names"],
             config["class_balancing"],
+            config["data_split_method"],
+            config["data_split_parameters"],
         )
