@@ -83,7 +83,7 @@ def _apply_class_balancing(
 
 
 def _split_data(
-    X: list, y: list, method: str, parameters: dict, people: List[int], stratify: bool
+    X: list, y: list, method: str, parameters: dict, people: List[int], stratify: list
 ) -> tuple[list, list, list, list]:
     """Split data into train/test sets based on the specified method."""
     if method == "random":
@@ -171,30 +171,42 @@ class BaseClassifier(abc.ABC):
         self.validate_model_metadata(model_metadata)
         return self.model
 
-    def validate_existing_model(self, model_path: str) -> bool:
+    def validate_existing_model(self, model_path: str):
 
         if os.path.exists(model_path):
             print(f"Existing model found at {model_path}; validating it.")
             loaded = joblib.load(model_path)
             model_metadata = loaded if isinstance(loaded, dict) else {}
             self.validate_model_metadata(model_metadata)
-            return True
-
-        return False
 
     def validate_model_metadata(self, metadata: dict):
         saved_input_len = metadata.get("input_len")
         saved_num_classes = metadata.get("num_classes")
+        saved_classifier = metadata.get("classifier")
+        saved_hyperparams = metadata.get("hyperparams")
 
         if saved_input_len is not None and int(saved_input_len) != self.input_len:
-            raise ValueError(
+            print(
                 f"Model input size mismatch: expected {self.input_len}, got {saved_input_len}"
             )
 
         if saved_num_classes is not None and int(saved_num_classes) != self.num_classes:
-            raise ValueError(
+            print(
                 f"Model output size mismatch: expected {self.num_classes}, got {saved_num_classes}"
             )
+
+        if saved_classifier is not None and saved_classifier != self.name:
+            print(
+                f"Model classifier mismatch: expected {self.name}, got {saved_classifier}"
+            )
+
+        for key, expected_value in self.hyperparams.items():
+            actual_value = saved_hyperparams.get(key)
+            if actual_value != expected_value:
+                print(
+                    f"Loaded model hyperparam mismatch for '{key}': "
+                    f"expected {expected_value}, got {actual_value}"
+                )
 
     def save_model(self, model_path: str):
         Path(model_path).parent.mkdir(parents=True, exist_ok=True)
@@ -398,6 +410,31 @@ class ClassifierManager:
     def register(cls, name: str, impl: Type[BaseClassifier]):
         cls._registry[name] = impl
 
+    def load(
+        self,
+        model_path: str,
+        hyperparams: dict,
+        num_classes: int,
+        **kwargs,
+    ):
+        loaded = joblib.load(model_path)
+        if not isinstance(loaded, dict) or "classifier" not in loaded:
+            raise ValueError("Saved model metadata missing classifier name")
+
+        name = loaded["classifier"]
+        impl = self._registry.get(name)
+        if impl is None:
+            raise ValueError(f"Classifier '{name}' not registered")
+
+        self.active = impl(
+            model_path=model_path,
+            hyperparams=hyperparams,
+            num_classes=num_classes,
+            input_len=self.input_len,
+            **kwargs,
+        )
+        return self.active
+
     def train(
         self,
         name: str,
@@ -418,14 +455,12 @@ class ClassifierManager:
             raise ValueError(f"Classifier '{name}' not registered")
 
         self.active = impl(
-            model_path=model_path if os.path.exists(model_path) else None,
+            model_path=None,
             hyperparams=hyperparams,
             num_classes=num_classes,
             input_len=self.input_len,
             **kwargs,
         )
-        if os.path.exists(model_path):
-            self.active.validate_existing_model(model_path)
 
         stratify_labels = labels if stratify else None
 
@@ -437,10 +472,13 @@ class ClassifierManager:
             people,
             stratify_labels,
         )
+
         print(f"X_train size: {len(X_train)}, X_test size: {len(X_test)}")
+
         X_train, y_train = _apply_class_balancing(
             X_train, y_train, method=class_balancing
         )
+
         print(f"X_train size: {len(X_train)}, X_test size: {len(X_test)}")
 
         self.active.fit(X_train, y_train)
