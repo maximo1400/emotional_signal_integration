@@ -138,13 +138,33 @@ class BaseClassifier(abc.ABC):
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
         raise NotImplementedError()
 
-    @abc.abstractmethod
     def predict(self, pow_vector: List[float]) -> str:
-        raise NotImplementedError()
+        if self.model is None:
+            raise RuntimeError(f"{self.name} model is not loaded")
 
-    @abc.abstractmethod
+        features = self._prepare_features(pow_vector)
+        prediction = self.model.predict(features)[0]
+        return _normalise_prediction_output(prediction)
+
     def predict_with_confidence(self, pow_vector: List[float]) -> Dict:
-        raise NotImplementedError()
+        if self.model is None:
+            raise RuntimeError(f"{self.name} model is not loaded")
+
+        features = self._prepare_features(pow_vector)
+
+        if hasattr(self.model, "predict_proba") and hasattr(self.model, "classes_"):
+            probabilities = self.model.predict_proba(features)[0]
+            class_index = int(np.argmax(probabilities))
+            return {
+                "label": _normalise_prediction_output(self.model.classes_[class_index]),
+                "confidence": float(probabilities[class_index]),
+            }
+
+        prediction = self.model.predict(features)[0]
+        return {
+            "label": _normalise_prediction_output(prediction),
+            "confidence": None,
+        }
 
     def batch_predict(self, pow_vectors: List[List[float]]) -> List[str]:
         if self.model is None:
@@ -245,39 +265,9 @@ class KNNClassifierAdapter(BaseClassifier):
         )
 
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        if self.model is None:
-            self.model = KNeighborsClassifier(**self.hyperparams)
+        self.model = KNeighborsClassifier(**self.hyperparams)
         self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
         return self.model
-
-    def predict(self, pow_vector: List[float]) -> str:
-        if self.model is None:
-            raise RuntimeError("KNN model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-        prediction = self.model.predict(features)[0]
-        return _normalise_prediction_output(prediction)
-
-    def predict_with_confidence(self, pow_vector: List[float]) -> Dict:
-        if self.model is None:
-            raise RuntimeError("KNN model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-        label = self.predict(pow_vector)
-        confidence = 0.65
-
-        if hasattr(self.model, "predict_proba"):
-            probabilities = self.model.predict_proba(features)[0]
-            confidence = float(np.max(probabilities))
-
-            if hasattr(self.model, "classes_"):
-                class_index = int(np.argmax(probabilities))
-                label = _normalise_prediction_output(self.model.classes_[class_index])
-
-        return {
-            "label": label,
-            "confidence": confidence,
-        }
 
 
 class SVMClassifierAdapter(BaseClassifier):
@@ -301,43 +291,9 @@ class SVMClassifierAdapter(BaseClassifier):
         fit_params = dict(self.hyperparams)
         fit_params.setdefault("probability", True)
 
-        if self.model is None:
-            self.model = SVC(**fit_params)
+        self.model = SVC(**fit_params)
         self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
         return self.model
-
-    def predict(self, pow_vector: List[float]) -> str:
-        if self.model is None:
-            raise RuntimeError("SVM model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-        prediction = self.model.predict(features)[0]
-        return _normalise_prediction_output(prediction)
-
-    def predict_with_confidence(self, pow_vector: List[float]) -> Dict:
-        if self.model is None:
-            raise RuntimeError("SVM model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-        label = self.predict(pow_vector)
-        confidence = 0.65
-
-        if hasattr(self.model, "predict_proba"):
-            probabilities = self.model.predict_proba(features)[0]
-            confidence = float(np.max(probabilities))
-
-            if hasattr(self.model, "classes_"):
-                class_index = int(np.argmax(probabilities))
-                label = _normalise_prediction_output(self.model.classes_[class_index])
-        elif hasattr(self.model, "decision_function"):
-            scores = self.model.decision_function(features)
-            score_array = np.asarray(scores)
-            confidence = float(1.0 / (1.0 + np.exp(-np.max(score_array))))
-
-        return {
-            "label": label,
-            "confidence": confidence,
-        }
 
 
 class RFClassifierAdapter(BaseClassifier):
@@ -358,39 +314,9 @@ class RFClassifierAdapter(BaseClassifier):
         )
 
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        if self.model is None:
-            self.model = RandomForestClassifier(**self.hyperparams)
+        self.model = RandomForestClassifier(**self.hyperparams)
         self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
         return self.model
-
-    def predict(self, pow_vector: List[float]) -> str:
-        if self.model is None:
-            raise RuntimeError("Random Forest model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-        prediction = self.model.predict(features)[0]
-        return _normalise_prediction_output(prediction)
-
-    def predict_with_confidence(self, pow_vector: List[float]) -> Dict:
-        if self.model is None:
-            raise RuntimeError("Random Forest model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-        label = self.predict(pow_vector)
-        confidence = 0.65
-
-        if hasattr(self.model, "predict_proba"):
-            probabilities = self.model.predict_proba(features)[0]
-            confidence = float(np.max(probabilities))
-
-            if hasattr(self.model, "classes_"):
-                class_index = int(np.argmax(probabilities))
-                label = _normalise_prediction_output(self.model.classes_[class_index])
-
-        return {
-            "label": label,
-            "confidence": confidence,
-        }
 
 
 class ClassifierManager:
