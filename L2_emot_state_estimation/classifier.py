@@ -12,9 +12,9 @@ Prediction API:
 """
 
 import abc
+import os
 from pathlib import Path
 from typing import Dict, List, Type
-
 import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -22,6 +22,8 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
+
+from utils import plot_confusion_matrix
 
 
 def _normalise_prediction_output(prediction) -> str:
@@ -52,7 +54,7 @@ class BaseClassifier(abc.ABC):
         self.input_len = input_len
 
         if model_path:
-            self.load_model(model_path)
+            self.load_model()
 
     @abc.abstractmethod
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
@@ -67,29 +69,60 @@ class BaseClassifier(abc.ABC):
         raise NotImplementedError()
 
     def batch_predict(self, pow_vectors: List[List[float]]) -> List[str]:
-        return [self.predict(v) for v in pow_vectors]
+        if self.model is None:
+            raise RuntimeError("Model is not loaded")
+
+        features = np.asarray(pow_vectors, dtype=float)
+        predictions = self.model.predict(features)
+        return [_normalise_prediction_output(prediction) for prediction in predictions]
 
     def batch_predict_with_confidence(
         self, pow_vectors: List[List[float]]
     ) -> List[Dict]:
         return [self.predict_with_confidence(v) for v in pow_vectors]
 
-    def load_model(self, model_path: str = None):
-        self.model_path = model_path or self.model_path
-        if not self.model_path:
-            return None
-
+    def load_model(self):
         loaded = joblib.load(self.model_path)
+        model_metadata = loaded if isinstance(loaded, dict) else {}
         self.model = (
             loaded.get("model")
             if isinstance(loaded, dict) and "model" in loaded
             else loaded
         )
-
+        print(
+            f"Loaded model from {self.model_path} with metadata: {model_metadata}"
+        )
+        self.validate_model_metadata(model_metadata)
         return self.model
+
+    def validate_existing_model(self, model_path: str) -> bool:
+
+        if os.path.exists(model_path):
+            print(f"Existing model found at {model_path}; validating it.")
+            loaded = joblib.load(model_path)
+            model_metadata = loaded if isinstance(loaded, dict) else {}
+            self.validate_model_metadata(model_metadata)
+            return True
+
+        return False
+
+    def validate_model_metadata(self, metadata: dict):
+        saved_input_len = metadata.get("input_len")
+        saved_num_classes = metadata.get("num_classes")
+
+        if saved_input_len is not None and int(saved_input_len) != self.input_len:
+            raise ValueError(
+                f"Model input size mismatch: expected {self.input_len}, got {saved_input_len}"
+            )
+
+        if saved_num_classes is not None and int(saved_num_classes) != self.num_classes:
+            raise ValueError(
+                f"Model output size mismatch: expected {self.num_classes}, got {saved_num_classes}"
+            )
 
     def save_model(self, model_path: str):
         Path(model_path).parent.mkdir(parents=True, exist_ok=True)
+        self.model_path = model_path
         joblib.dump(
             {
                 "model": self.model,
@@ -124,7 +157,8 @@ class KNNClassifierAdapter(BaseClassifier):
         )
 
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        self.model = KNeighborsClassifier(**self.hyperparams)
+        if self.model is None:
+            self.model = KNeighborsClassifier(**self.hyperparams)
         self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
         return self.model
 
@@ -179,7 +213,8 @@ class SVMClassifierAdapter(BaseClassifier):
         fit_params = dict(self.hyperparams)
         fit_params.setdefault("probability", True)
 
-        self.model = SVC(**fit_params)
+        if self.model is None:
+            self.model = SVC(**fit_params)
         self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
         return self.model
 
@@ -235,7 +270,8 @@ class RFClassifierAdapter(BaseClassifier):
         )
 
     def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        self.model = RandomForestClassifier(**self.hyperparams)
+        if self.model is None:
+            self.model = RandomForestClassifier(**self.hyperparams)
         self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
         return self.model
 
@@ -300,7 +336,7 @@ class ClassifierManager:
 
         self.active = impl(
             model_path=model_path,
-            hyperparams=hyperparams or {},
+            hyperparams=hyperparams,
             num_classes=num_classes,
             input_len=self.input_len,
             **kwargs,
@@ -312,9 +348,9 @@ class ClassifierManager:
         name: str,
         pow_vectors: List[List[float]],
         labels: List[str],
-        model_path: str = None,
-        hyperparams: dict = None,
-        num_classes: int = None,
+        model_path: str,
+        hyperparams: dict,
+        num_classes: int,
         test_size: float = 0.2,
         random_state: int = 42,
         stratify: bool = True,
@@ -325,12 +361,14 @@ class ClassifierManager:
             raise ValueError(f"Classifier '{name}' not registered")
 
         self.active = impl(
-            model_path=None,
-            hyperparams=hyperparams or {},
+            model_path=model_path if os.path.exists(model_path) else None,
+            hyperparams=hyperparams,
             num_classes=num_classes,
             input_len=self.input_len,
             **kwargs,
         )
+        if os.path.exists(model_path):
+            self.active.validate_existing_model(model_path)
 
         stratify_labels = labels if stratify else None
         X_train, X_test, y_train, y_test = train_test_split(
@@ -350,6 +388,7 @@ class ClassifierManager:
         print("Accuracy:", accuracy_score(y_test, y_pred))
         print(classification_report(y_test, y_pred))
 
+        plot_confusion_matrix(y_test, y_pred)
         return self.active
 
     def predict(self, pow_vector: List[float]) -> str:

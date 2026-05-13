@@ -101,7 +101,7 @@ def train_model(
         pow_columns: List of column names for power band features in the Feather file
         output_dir: Directory to save L2 predictions CSV
         emotional_states_areas: List of dicts defining emotional state areas in VA space
-        classifier: Classifier type (e.g., "stub", "svm", "nn")
+        classifier: Classifier type (e.g., "random_forest", "svm", "knn")
         classifier_hyperparameters: Hyperparameters for the classifier (dict)
         num_classes: Number of emotion classes to predict
     """
@@ -112,7 +112,8 @@ def train_model(
     run_output_dir.mkdir(parents=True, exist_ok=True)
 
     df = feather.read_feather(feather_path)
-    # df = df.head(20)
+    # df = df.head(5000)
+    df = df[df["subject_id"] < 2]
     pow_data, labels = _collect_pow_features(df, pow_columns, num_classes)
     classifier_input_len = len(pow_data[0])
 
@@ -120,35 +121,14 @@ def train_model(
 
     model_path = f"{model_folder}/{models_names[classifier]}"
 
-    if os.path.exists(model_path):
-        # Load/select existing model
-        classifier_manager.select(
-            classifier,
-            model_path=model_path,
-            hyperparams=classifier_hyperparameters,
-            num_classes=num_classes,
-        )
-
-        # Inspect saved model metadata and warn on mismatches with current inputs/outputs
-        # TODO: Implement metadata saving and inspection in ClassifierManager
-        # loaded_metadata = classifier_manager.get_model_metadata(model_path)
-        # model_input_len = loaded_metadata["pow_columns"]
-        # model_num_classes = loaded_metadata["num_classes"]
-        # if model_input_len != len(pow_columns) or model_num_classes != num_classes:
-        #     warnings.warn(
-        #         f"Loaded model metadata mismatch: expected input length {model_input_len} and num_classes {model_num_classes}\
-        #               but got input length {len(pow_columns)} and num_classes {num_classes}. Predictions may be unreliable."
-        #     )
-
-    else:
-        classifier_manager.train(
-            classifier,
-            pow_data,
-            labels,
-            model_path=model_path,
-            hyperparams=classifier_hyperparameters,
-            num_classes=num_classes,
-        )
+    classifier_manager.train(
+        classifier,
+        pow_data,
+        labels,
+        model_path,
+        classifier_hyperparameters,
+        num_classes,
+    )
 
 
 # def predict():
