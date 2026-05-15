@@ -2,9 +2,9 @@
 Layer 2 Runner: Example of how to use the classifier with L1 output
 
 Modes:
-1. feather_mode: Process L1 output from Feather file (DREAMER dataset)
-2. queue_mode: Connect to live L1 output queue (real-time)
-3. csv_mode: Process L1 output CSV (batch)
+train: Train the classifier using the processed data from DREAMER.
+predict_from_queue: Load a trained model from file and use it to make predictions on incoming data from L1 queue.
+predict_from_file: Load a trained model from file and use it to make predictions on newest L1 output data.
 """
 
 import sys
@@ -93,6 +93,7 @@ def train_model(
     class_balancing: str,
     data_split_method: str,
     data_split_parameters: dict,
+    pow_data_source: str,
 ):
     """
     Process from Feather file (DREAMER).
@@ -109,10 +110,6 @@ def train_model(
         data_split_parameters: Parameters for the data splitting method (dict)
     """
     print(f"Running L2 in Feather mode: {feather_path}")
-
-    run_stamp = str(int(time.time()))
-    run_output_dir = Path(output_dir) / run_stamp
-    run_output_dir.mkdir(parents=True, exist_ok=True)
 
     df = feather.read_feather(feather_path)
     # df = df.head(5000)
@@ -137,6 +134,64 @@ def train_model(
         people,
     )
 
+    run_stamp = str(int(time.time()))
+    output_folder = Path(f"{output_dir}/{pow_data_source}_{run_stamp}")
+    output_folder.mkdir(parents=True, exist_ok=True)
+    output_file = output_folder / "predictions.csv"
+
+
+def predict_from_file(
+    model_folder: str,
+    classifier: str,
+    l1_output_folder: str,
+    pow_data_source: str,
+    output_csv_folder: str,
+    pow_columns: list,
+    num_classes: int,
+    models_names: dict[str, str],
+    pow_csv_path: str,
+):
+    """
+    Load a trained model from file and use it to make predictions on newest L1 output data.
+
+    Args:
+        model_path: Path to the saved model file (e.g., .joblib)
+        l1_output_folder: Path to L1 output csv file
+        pow_data_source: Source of power data in L1 output ("emotiv" or "virtual")
+        output_csv_path: Path to save the predictions CSV
+    """
+
+    if not pow_csv_path.exists():
+        raise FileNotFoundError(f"Missing pow.csv at {pow_csv_path}")
+
+    df = pd.read_csv(pow_csv_path)
+    df.columns = [str(column).strip() for column in df.columns]
+
+    feat_select = FeatureSelector()
+    pow_vectors = []
+    df_pow = df.reindex(columns=pow_columns)
+
+    for _, row in df_pow.iterrows():
+        pow_vectors.append(feat_select.process_data(row.tolist()))
+
+    classifier_input_len = len(pow_vectors[0])
+    classifier_manager = ClassifierManager(classifier_input_len)
+
+    model_folder = f"{model_folder}/{models_names[classifier]}"
+    classifier_manager.load(str(model_folder), num_classes=num_classes)
+
+    predictions = classifier_manager.batch_predict_with_confidence(pow_vectors)
+    output_frame = pd.DataFrame(predictions)
+
+    run_stamp = str(int(time.time()))
+    output_folder = Path(f"{output_csv_folder}/{pow_data_source}_{run_stamp}")
+    output_folder.mkdir(parents=True, exist_ok=True)
+    output_file = output_folder / "predictions.csv"
+
+    output_frame.to_csv(output_file, index=False)
+    print(f"Running L2 in predict_from_file mode: {pow_csv_path}")
+    print(f"Saved predictions to {output_file}")
+
 
 if __name__ == "__main__":
     config = get_config(
@@ -145,7 +200,7 @@ if __name__ == "__main__":
             "POW_COLUMNS",
             "l2_output_folder",
             "classifier",
-            "clasfier_mode",
+            "classifier_mode",
             "classifier_hyperparameters",
             "num_classes",
             "models_folder",
@@ -153,11 +208,14 @@ if __name__ == "__main__":
             "class_balancing",
             "data_split_method",
             "data_split_parameters",
+            "L1_output_folder",
+            "pow_data_source",
+            "predict_from_file_pow_csv_path",
         ]
     )
 
     # Run in Feather mode (DREAMER dataset)
-    if config["clasfier_mode"] == "train":
+    if config["classifier_mode"] == "train":
         train_model(
             config["feather_file_path"],
             config["POW_COLUMNS"],
@@ -170,4 +228,18 @@ if __name__ == "__main__":
             config["class_balancing"],
             config["data_split_method"],
             config["data_split_parameters"],
+            config["pow_data_source"],
+        )
+
+    elif config["classifier_mode"] == "predict_from_file":
+        predict_from_file(
+            config["models_folder"],
+            config["classifier"],
+            config["L1_output_folder"],
+            config["pow_data_source"],
+            config["l2_output_folder"],
+            config["POW_COLUMNS"],
+            config["num_classes"],
+            config["models_names"],
+            config["predict_from_file_pow_csv_path"],
         )
