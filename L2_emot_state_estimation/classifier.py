@@ -242,7 +242,6 @@ class ClassifierManager:
 
         return {
             "model": self.active_model,
-            "X_test": X_test,
             "y_test": y_test,
             "y_pred": np.asarray(y_pred),
         }

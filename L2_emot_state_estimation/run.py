@@ -94,6 +94,39 @@ def _build_output_file(
     return output_folder / filename
 
 
+def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str]]:
+    valence = []
+    arousal = []
+
+    for label in labels:
+        va, ar = str(label).split("_")
+        valence.append(va)
+        arousal.append(ar)
+
+    return valence, arousal
+
+
+def _evaluate_predictions(
+    true_labels: list[str],
+    predicted_labels: list[str],
+):
+    true_valence, true_arousal = _split_va_labels(true_labels)
+    predicted_valence, predicted_arousal = _split_va_labels(predicted_labels)
+
+    print("Joint accuracy:", accuracy_score(true_labels, predicted_labels))
+    print("Valence accuracy:", accuracy_score(true_valence, predicted_valence))
+    print("Arousal accuracy:", accuracy_score(true_arousal, predicted_arousal))
+    print(classification_report(true_labels, predicted_labels, zero_division=0))
+    plot_confusion_matrix(true_labels, predicted_labels)
+
+    return {
+        "true_valence": true_valence,
+        "true_arousal": true_arousal,
+        "pred_valence": predicted_valence,
+        "pred_arousal": predicted_arousal,
+    }
+
+
 def train_model():
     config = get_config(
         [
@@ -144,39 +177,21 @@ def train_model():
         people,
     )
 
-    true_labels = train_result["y_test"]
-    predictions = train_result["y_pred"]
+    true_labels = [str(label) for label in train_result["y_test"]]
+    predicted_labels = [str(label) for label in train_result["y_pred"]]
 
-    predicted_valence = []
-    predicted_arousal = []
-    predicted_labels = []
-    for prediction in predictions:
-        label = prediction["label"]
-        predicted_labels.append(str(label))
+    eval_data = _evaluate_predictions(true_labels, predicted_labels)
 
-        va, ar = label.split("_")
-        predicted_valence.append(str(va))
-        predicted_arousal.append(str(ar))
-
-    true_valence = []
-    true_arousal = []
-    for label in true_labels:
-        va, ar = label.split("_")
-        true_valence.append(str(va))
-        true_arousal.append(str(ar))
-
-    print("Joint accuracy:", accuracy_score(true_labels, predicted_labels))
-    print("Valence accuracy:", accuracy_score(true_valence, predicted_valence))
-    print("Arousal accuracy:", accuracy_score(true_arousal, predicted_arousal))
-    print(classification_report(true_labels, predicted_labels, zero_division=0))
-    plot_confusion_matrix(true_labels, predicted_labels)
-
-    output_frame = pd.DataFrame(predictions)
-    output_frame["true_label"] = true_labels
-    output_frame["true_valence"] = true_valence
-    output_frame["true_arousal"] = true_arousal
-    output_frame["pred_valence"] = predicted_valence
-    output_frame["pred_arousal"] = predicted_arousal
+    output_frame = pd.DataFrame(
+        {
+            "true_label": true_labels,
+            "pred_label": predicted_labels,
+            "true_valence": eval_data["true_valence"],
+            "true_arousal": eval_data["true_arousal"],
+            "pred_valence": eval_data["pred_valence"],
+            "pred_arousal": eval_data["pred_arousal"],
+        }
+    )
 
     output_file = _build_output_file(
         config["l2_output_folder"],
@@ -246,36 +261,34 @@ def predict_from_file():
         true_arousal = _set_va_range(df["arousal"].tolist(), config["num_classes"])
         true_labels = _va_to_label(true_valence, true_arousal)
 
-        predicted_valence = []
-        predicted_arousal = []
-        predicted_labels = []
-        for prediction in predictions:
-            label = prediction["label"]
-            predicted_labels.append(str(label))
+        predicted_labels = [str(prediction["label"]) for prediction in predictions]
 
-            va, ar = label.split("_")
-            predicted_valence.append(str(va))
-            predicted_arousal.append(str(ar))
-
-        print("Joint accuracy:", accuracy_score(true_labels, predicted_labels))
-        print("Valence accuracy:", accuracy_score(true_valence, predicted_valence))
-        print("Arousal accuracy:", accuracy_score(true_arousal, predicted_arousal))
-        print(classification_report(true_labels, predicted_labels, zero_division=0))
-        plot_confusion_matrix(true_labels, predicted_labels)
+        eval_data = _evaluate_predictions(true_labels, predicted_labels)
 
         output_frame["true_label"] = true_labels
-        output_frame["true_valence"] = true_valence
-        output_frame["true_arousal"] = true_arousal
-        output_frame["pred_valence"] = predicted_valence
-        output_frame["pred_arousal"] = predicted_arousal
+        output_frame["true_valence"] = eval_data["true_valence"]
+        output_frame["true_arousal"] = eval_data["true_arousal"]
+        output_frame["pred_valence"] = eval_data["pred_valence"]
+        output_frame["pred_arousal"] = eval_data["pred_arousal"]
 
     output_file = _build_output_file(
         config["l2_output_folder"],
         config["pow_data_source"],
     )
     output_frame.to_csv(output_file, index=False)
+    report_file = output_file.with_name("evaluation.txt")
+    report_file.write_text(
+        "\n".join(
+            [
+                f"Joint accuracy: {accuracy_score(true_labels, predicted_labels):.4f}",
+                classification_report(true_labels, predicted_labels, zero_division=0),
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     print(f"Saved predictions to {output_file}")
+    print(f"Saved evaluation report to {report_file}")
 
 
 if __name__ == "__main__":
@@ -288,6 +301,6 @@ if __name__ == "__main__":
         predict_from_file()
 
     elif config["classifier_mode"] == "predict_from_queue":
-        raise Warning(
+        raise NotImplementedError(
             "predict_from_queue needs to be runned from main.py to access the L1 queue"
         )
