@@ -11,6 +11,7 @@ Modes:
 import sys
 import time
 from pathlib import Path
+import queue
 
 import pandas as pd
 
@@ -22,6 +23,16 @@ from utils import plot_confusion_matrix
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_loader import get_config
+
+
+def _row_to_pow_values(row, pow_columns: list[str]) -> list[float]:
+    if isinstance(row, pd.Series):
+        return row.reindex(pow_columns).tolist()
+
+    if isinstance(row, dict):
+        return [row[column] for column in pow_columns]
+
+    return list(row)
 
 
 def _set_va_range(values: list[int], num_classes: int) -> list[int]:
@@ -289,6 +300,49 @@ def predict_from_file():
 
     print(f"Saved predictions to {output_file}")
     print(f"Saved evaluation report to {report_file}")
+
+
+def predict_from_queue(pow_queue: queue.Queue):
+    config = get_config(
+        [
+            "models_folder",
+            "classifier",
+            "POW_COLUMNS",
+            "num_classes",
+            "models_names",
+        ]
+    )
+    classifier = config["classifier"]
+    pow_columns = config["POW_COLUMNS"]
+
+    print("Running L2 in predict_from_queue mode")
+
+    feat_select = FeatureSelector()
+    model_path = _build_model_path(
+        config["models_folder"],
+        config["models_names"],
+        classifier,
+    )
+
+    first_loop = True
+    while True:
+        row = pow_queue.get()
+
+        if row is None:  # TODO - define a more robust stop signal
+            print("L2 queue received stop signal")
+            break
+
+        pow_values = _row_to_pow_values(row, pow_columns)
+        pow_vector = feat_select.process_data(pow_values)
+
+        if first_loop:
+            classifier_manager = ClassifierManager(len(pow_vector))
+            classifier_manager.load(model_path, num_classes=config["num_classes"])
+            first_loop = False
+
+        prediction = classifier_manager.predict_with_confidence(pow_vector)
+
+        print(f"label={prediction['label']}, confidence={prediction['confidence']}")
 
 
 if __name__ == "__main__":
