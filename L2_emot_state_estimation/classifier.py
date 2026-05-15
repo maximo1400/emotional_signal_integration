@@ -2,21 +2,20 @@
 Classifier selector / manager.
 
 This module provides:
-- `BaseClassifier` abstract interface for classifier implementations
-- adapters for KNN / SVM / RandomForest
-- `ClassifierManager` registry + selector to instantiate the chosen classifier
+- adapters for KNN / SVM / RandomForest through a simple factory
+- ClassifierManager to train, save, load, and run predictions
 
 Prediction API:
-- `predict(...)` -> label string
-- `predict_with_confidence(...)` -> {"label": str, "confidence": float}
+- predict(...) -> label string
+- predict_with_confidence(...) -> {"label": str, "confidence": float | None}
 """
 
-import abc
-import os
 from pathlib import Path
-from typing import Dict, List, Type
+from typing import Any
+
 import joblib
 import numpy as np
+import warnings
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
@@ -26,426 +25,263 @@ from sklearn.svm import SVC
 from utils import plot_confusion_matrix
 
 
-def _normalise_prediction_output(prediction) -> str:
-    """Convert sklearn outputs to a stable label string."""
-    if isinstance(prediction, np.ndarray):
-        if prediction.size == 1:
-            return str(prediction.item())
-        return str(prediction.tolist())
-    return str(prediction)
+CLASSIFIERS = {
+    "knn": KNeighborsClassifier,
+    "svm": SVC,
+    "random_forest": RandomForestClassifier,
+}
 
 
-def _apply_class_balancing(
-    X_train: list, y_train: list, method: str, random_state: int = 42
-):
-    """Apply class balancing to the training data."""
-    if method == "none":
-        return X_train, y_train
+def _build_estimator(name: str, hyperparams: dict[str, Any]):
+    if name not in CLASSIFIERS:
+        raise ValueError(f"Classifier '{name}' not registered")
 
-    elif method == "undersample":
-        X_train = np.asarray(X_train, dtype=object)
-        y_train = np.asarray(y_train)
+    params = dict(hyperparams or {})
 
-        classes, counts = np.unique(y_train, return_counts=True)
-        target_count = int(np.min(counts))
-        rng = np.random.default_rng(random_state)
+    # SVM needs probability=True to enable confidence outputs
+    if name == "svm":
+        params.setdefault("probability", True)
 
-        sampled_indices = []
-        for class_label in classes:
-            class_indices = np.flatnonzero(y_train == class_label)
-            chosen_indices = rng.choice(class_indices, size=target_count, replace=False)
-            sampled_indices.extend(chosen_indices.tolist())
-
-        sampled_indices = rng.permutation(sampled_indices)
-        return X_train[sampled_indices].tolist(), y_train[sampled_indices].tolist()
-
-    elif method == "oversample":
-        X_train = np.asarray(X_train, dtype=object)
-        y_train = np.asarray(y_train)
-
-        classes, counts = np.unique(y_train, return_counts=True)
-        target_count = int(np.max(counts))
-        rng = np.random.default_rng(random_state)
-
-        sampled_indices = []
-        for class_label in classes:
-            class_indices = np.flatnonzero(y_train == class_label)
-            replace = len(class_indices) < target_count
-            chosen_indices = rng.choice(
-                class_indices, size=target_count, replace=replace
-            )
-            sampled_indices.extend(chosen_indices.tolist())
-
-        sampled_indices = rng.permutation(sampled_indices)
-        return X_train[sampled_indices].tolist(), y_train[sampled_indices].tolist()
-    else:
-        raise ValueError(f"Invalid class balancing method: {method}")
+    return CLASSIFIERS[name](**params)
 
 
 def _split_data(
-    X: list, y: list, method: str, parameters: dict, people: List[int], stratify: list
-) -> tuple[list, list, list, list]:
+    X: np.ndarray,
+    y: np.ndarray,
+    method: str,
+    parameters: dict,
+    people: list[int] | None,  # Optional
+    stratify: bool,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Split data into train/test sets based on the specified method."""
     if method == "random":
-        test_size = parameters["random"]["test_size"]
-        random_state = parameters["random"]["random_state"]
         return train_test_split(
             X,
             y,
-            test_size=test_size,
-            random_state=random_state,
-            stratify=stratify,
+            test_size=parameters["random"]["test_size"],
+            random_state=parameters["random"]["random_state"],
+            stratify=y if stratify else None,
         )
 
-    elif method == "subject":
-        test_subjects = parameters["subject"]["test_subjects"]
-        X = np.asarray(X, dtype=float)
-        y = np.asarray(y)
+    if method == "subject":
         people = np.asarray(people)
-
+        test_subjects = parameters["subject"]["test_subjects"]
         test_mask = np.isin(people, test_subjects)
-        X_train, X_test = X[~test_mask].tolist(), X[test_mask].tolist()
-        y_train, y_test = y[~test_mask].tolist(), y[test_mask].tolist()
+        return X[~test_mask], X[test_mask], y[~test_mask], y[test_mask]
 
-        if len(test_subjects) == 0 or len(test_subjects) == len(np.unique(people)):
-            print("Warning: Check that 'test_subjects' are correctly specified.")
-        return X_train, X_test, y_train, y_test
+    raise ValueError(f"Invalid data split method: {method}")
 
+
+def _apply_class_balancing(
+    X: np.ndarray,
+    y: np.ndarray,
+    method: str,
+    random_state: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply simple over/under-sampling to the training data."""
+    if method == "none":
+        return X, y
+
+    classes, counts = np.unique(y, return_counts=True)
+    rng = np.random.default_rng(random_state)
+
+    if method == "undersample":
+        target_count = int(np.min(counts))
+    elif method == "oversample":
+        target_count = int(np.max(counts))
     else:
-        raise ValueError(f"Invalid data split method: {method}")
+        raise ValueError(f"Invalid class balancing method: {method}")
 
+    sampled_indices = []
 
-class BaseClassifier(abc.ABC):
-    """Abstract base for classifier implementations."""
-
-    name: str = "base"
-
-    def __init__(
-        self,
-        model_path: str = None,
-        hyperparams: dict = None,
-        num_classes: int = None,
-        input_len: int = None,
-    ):
-        self.model = None
-        self.model_path = model_path
-        self.hyperparams = hyperparams
-        self.num_classes = num_classes
-        self.input_len = input_len
-
-        if model_path:
-            self.load_model()
-
-    @abc.abstractmethod
-    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        raise NotImplementedError()
-
-    def predict(self, pow_vector: List[float]) -> str:
-        if self.model is None:
-            raise RuntimeError(f"{self.name} model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-        prediction = self.model.predict(features)[0]
-        return _normalise_prediction_output(prediction)
-
-    def predict_with_confidence(self, pow_vector: List[float]) -> Dict:
-        if self.model is None:
-            raise RuntimeError(f"{self.name} model is not loaded")
-
-        features = self._prepare_features(pow_vector)
-
-        if hasattr(self.model, "predict_proba") and hasattr(self.model, "classes_"):
-            probabilities = self.model.predict_proba(features)[0]
-            class_index = int(np.argmax(probabilities))
-            return {
-                "label": _normalise_prediction_output(self.model.classes_[class_index]),
-                "confidence": float(probabilities[class_index]),
-            }
-
-        prediction = self.model.predict(features)[0]
-        return {
-            "label": _normalise_prediction_output(prediction),
-            "confidence": None,
-        }
-
-    def batch_predict(self, pow_vectors: List[List[float]]) -> List[str]:
-        if self.model is None:
-            raise RuntimeError("Model is not loaded")
-
-        features = np.asarray(pow_vectors, dtype=float)
-        predictions = self.model.predict(features)
-        return [_normalise_prediction_output(prediction) for prediction in predictions]
-
-    def batch_predict_with_confidence(
-        self, pow_vectors: List[List[float]]
-    ) -> List[Dict]:
-        return [self.predict_with_confidence(v) for v in pow_vectors]
-
-    def load_model(self):
-        loaded = joblib.load(self.model_path)
-        model_metadata = loaded if isinstance(loaded, dict) else {}
-        self.model = (
-            loaded.get("model")
-            if isinstance(loaded, dict) and "model" in loaded
-            else loaded
+    for class_label in classes:
+        class_indices = np.flatnonzero(y == class_label)
+        replace = method == "oversample" and len(class_indices) < target_count
+        chosen_indices = rng.choice(
+            class_indices,
+            size=target_count,
+            replace=replace,
         )
-        # print(f"Loaded model from {self.model_path} with metadata: {model_metadata}")
-        self.validate_model_metadata(model_metadata)
-        return self.model
+        sampled_indices.append(chosen_indices)
 
-    def validate_existing_model(self, model_path: str):
+    sampled_indices = np.concatenate(sampled_indices)
+    sampled_indices = rng.permutation(sampled_indices)
 
-        if os.path.exists(model_path):
-            print(f"Existing model found at {model_path}; validating it.")
-            loaded = joblib.load(model_path)
-            model_metadata = loaded if isinstance(loaded, dict) else {}
-            self.validate_model_metadata(model_metadata)
-
-    def validate_model_metadata(self, metadata: dict):
-        saved_input_len = metadata.get("input_len")
-        saved_num_classes = metadata.get("num_classes")
-        saved_classifier = metadata.get("classifier")
-        saved_hyperparams = metadata.get("hyperparams")
-
-        if int(saved_input_len) != self.input_len:
-            print(
-                f"Model input size mismatch: expected {self.input_len}, got {saved_input_len}"
-            )
-
-        if int(saved_num_classes) != self.num_classes:
-            print(
-                f"Model output size mismatch: expected {self.num_classes}, got {saved_num_classes}"
-            )
-
-        if saved_classifier != self.name:
-            print(
-                f"Model classifier mismatch: expected {self.name}, got {saved_classifier}"
-            )
-
-        for key, expected_value in self.hyperparams.items():
-            actual_value = saved_hyperparams.get(key)
-            if actual_value != expected_value:
-                print(
-                    f"Loaded model hyperparam mismatch for '{key}': "
-                    f"expected {expected_value}, got {actual_value}"
-                )
-
-    def save_model(self, model_path: str):
-        Path(model_path).parent.mkdir(parents=True, exist_ok=True)
-        self.model_path = model_path
-        joblib.dump(
-            {
-                "model": self.model,
-                "classifier": self.name,
-                "hyperparams": self.hyperparams,
-                "num_classes": self.num_classes,
-                "input_len": self.input_len,
-            },
-            model_path,
-        )
-        return model_path
-
-    def _prepare_features(self, pow_vector: List[float]) -> np.ndarray:
-        return np.asarray(pow_vector, dtype=float).reshape(1, -1)
-
-
-class KNNClassifierAdapter(BaseClassifier):
-    name = "knn"
-
-    def __init__(
-        self,
-        model_path: str = None,
-        hyperparams: dict = None,
-        num_classes: int = None,
-        input_len: int = None,
-    ):
-        super().__init__(
-            model_path=model_path,
-            hyperparams=hyperparams["knn"],
-            num_classes=num_classes,
-            input_len=input_len,
-        )
-
-    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        self.model = KNeighborsClassifier(**self.hyperparams)
-        self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
-        return self.model
-
-
-class SVMClassifierAdapter(BaseClassifier):
-    name = "svm"
-
-    def __init__(
-        self,
-        model_path: str = None,
-        hyperparams: dict = None,
-        num_classes: int = None,
-        input_len: int = None,
-    ):
-        super().__init__(
-            model_path=model_path,
-            hyperparams=hyperparams["svm"],
-            num_classes=num_classes,
-            input_len=input_len,
-        )
-
-    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        fit_params = dict(self.hyperparams)
-        fit_params.setdefault("probability", True)
-
-        self.model = SVC(**fit_params)
-        self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
-        return self.model
-
-
-class RFClassifierAdapter(BaseClassifier):
-    name = "random_forest"
-
-    def __init__(
-        self,
-        model_path: str = None,
-        hyperparams: dict = None,
-        num_classes: int = None,
-        input_len: int = None,
-    ):
-        super().__init__(
-            model_path=model_path,
-            hyperparams=hyperparams["random_forest"],
-            num_classes=num_classes,
-            input_len=input_len,
-        )
-
-    def fit(self, pow_vectors: List[List[float]], labels: List[str]):
-        self.model = RandomForestClassifier(**self.hyperparams)
-        self.model.fit(np.asarray(pow_vectors, dtype=float), np.asarray(labels))
-        return self.model
+    return X[sampled_indices], y[sampled_indices]
 
 
 class ClassifierManager:
-    """Registry + selector for classifier implementations."""
-
-    _registry = {
-        KNNClassifierAdapter.name: KNNClassifierAdapter,
-        SVMClassifierAdapter.name: SVMClassifierAdapter,
-        RFClassifierAdapter.name: RFClassifierAdapter,
-    }
+    """Train, save, load, and use one of the supported sklearn classifiers."""
 
     def __init__(self, input_len: int):
         self.input_len = input_len
-        self.active: BaseClassifier = None
+        self.active_model = None
+        self.active_name: str | None = None
+        self.active_hyperparams: dict[str, Any] | None = None
+        self.active_num_classes: int | None = None
 
-        self.register(KNNClassifierAdapter.name, KNNClassifierAdapter)
-        self.register(SVMClassifierAdapter.name, SVMClassifierAdapter)
-        self.register(RFClassifierAdapter.name, RFClassifierAdapter)
+    def _ensure_active(self):
+        if self.active_model is None:
+            raise RuntimeError("No classifier selected")
 
-    @classmethod
-    def register(cls, name: str, impl: Type[BaseClassifier]):
-        cls._registry[name] = impl
-
-    def load(
+    def _warn_on_metadata_mismatch(
         self,
-        model_path: str,
-        hyperparams: dict,
-        num_classes: int,
-        **kwargs,
+        metadata: dict[str, Any],
+        expected_num_classes: int | None,
     ):
-        loaded = joblib.load(model_path)
-        if not isinstance(loaded, dict) or "classifier" not in loaded:
-            raise ValueError("Saved model metadata missing classifier name")
+        saved_input_len = metadata.get("input_len")
+        saved_num_classes = metadata.get("num_classes")
 
-        name = loaded["classifier"]
-        impl = self._registry.get(name)
-        if impl is None:
-            raise ValueError(f"Classifier '{name}' not registered")
+        if (
+            saved_input_len is not None
+            and self.input_len is not None
+            and int(saved_input_len) != int(self.input_len)
+        ):
+            warnings.warn(
+                "Loaded model input length does not match current manager input "
+                f"length: saved={saved_input_len}, expected={self.input_len}",
+                stacklevel=2,
+            )
 
-        self.active = impl(
-            model_path=model_path,
-            hyperparams=hyperparams,
-            num_classes=num_classes,
-            input_len=self.input_len,
-            **kwargs,
-        )
-        return self.active
+        if (
+            saved_num_classes is not None
+            and expected_num_classes is not None
+            and int(saved_num_classes) != int(expected_num_classes)
+        ):
+            warnings.warn(
+                "Loaded model output class count does not match expected class "
+                f"count: saved={saved_num_classes}, expected={expected_num_classes}",
+                stacklevel=2,
+            )
+
+    def save_model(self, model_path: str):
+        self._ensure_active()
+
+        Path(model_path).parent.mkdir(parents=True, exist_ok=True)
+
+        payload = {
+            "model": self.active_model,
+            "classifier": self.active_name,
+            "hyperparams": self.active_hyperparams,
+            "input_len": self.input_len,
+            "num_classes": self.active_num_classes,
+        }
+
+        joblib.dump(payload, model_path)
+        return model_path
+
+    def load(self, model_path: str, num_classes: int | None = None):
+        payload = joblib.load(model_path)
+
+        model = payload["model"]
+        classifier_name = payload["classifier"]
+        hyperparams = payload.get("hyperparams", {})
+
+        if classifier_name not in CLASSIFIERS:
+            raise ValueError(f"Classifier '{classifier_name}' not registered")
+
+        self._warn_on_metadata_mismatch(payload, num_classes)
+
+        self.active_model = model
+        self.active_name = classifier_name
+        self.active_hyperparams = hyperparams
+        self.active_num_classes = payload.get("num_classes", num_classes)
+
+        return self.active_model
 
     def train(
         self,
         name: str,
-        pow_vectors: List[List[float]],
-        labels: List[str],
+        pow_vectors: list[list[float]],
+        labels: list[str],
         model_path: str,
-        hyperparams: dict,
+        hyperparams: dict[str, Any],
         num_classes: int,
         class_balancing: str,
         data_split_method: str,
         data_split_parameters: dict,
-        people: List[int],
+        people: list[int],
         stratify: bool = True,
-        **kwargs,
     ):
-        impl = self._registry.get(name)
-        if impl is None:
-            raise ValueError(f"Classifier '{name}' not registered")
-
-        self.active = impl(
-            model_path=None,
-            hyperparams=hyperparams,
-            num_classes=num_classes,
-            input_len=self.input_len,
-            **kwargs,
-        )
-
-        stratify_labels = labels if stratify else None
+        X = np.asarray(pow_vectors, dtype=float)
+        y = np.asarray(labels)
 
         X_train, X_test, y_train, y_test = _split_data(
-            pow_vectors,
-            labels,
+            X,
+            y,
             data_split_method,
             data_split_parameters,
             people,
-            stratify_labels,
+            stratify,
         )
 
         print(f"X_train size: {len(X_train)}, X_test size: {len(X_test)}")
 
         X_train, y_train = _apply_class_balancing(
-            X_train, y_train, method=class_balancing
+            X_train,
+            y_train,
+            method=class_balancing,
         )
 
-        print(f"X_train size: {len(X_train)}, X_test size: {len(X_test)}")
+        print(
+            f"X_train size after balancing: {len(X_train)}, X_test size: {len(X_test)}"
+        )
 
-        self.active.fit(X_train, y_train)
-        y_pred = self.active.batch_predict(X_test)
+        model = _build_estimator(name, hyperparams)
+        model.fit(X_train, y_train)
+
+        self.active_model = model
+        self.active_name = name
+        self.active_hyperparams = hyperparams
+        self.active_num_classes = num_classes
+
+        y_pred = self.batch_predict(X_test)
 
         if model_path:
-            self.active.save_model(model_path)
+            self.save_model(model_path)
 
         print("Accuracy:", accuracy_score(y_test, y_pred))
         print(classification_report(y_test, y_pred))
-
         plot_confusion_matrix(y_test, y_pred)
-        return self.active
 
-    def predict(self, pow_vector: List[float]) -> str:
-        if not self.active:
-            raise RuntimeError("No classifier selected")
-        return self.active.predict(pow_vector)
+        return self.active_model
 
-    def predict_with_confidence(self, pow_vector: List[float]) -> Dict:
-        if not self.active:
-            raise RuntimeError("No classifier selected")
-        return self.active.predict_with_confidence(pow_vector)
+    def predict(self, pow_vector: list[float]) -> str:
+        return self.batch_predict([pow_vector])[0]
 
-    def batch_predict(self, pow_vectors: List[List[float]]) -> List[str]:
-        if not self.active:
-            raise RuntimeError("No classifier selected")
-        return self.active.batch_predict(pow_vectors)
+    def predict_with_confidence(self, pow_vector: list[float]) -> dict[str, Any]:
+        return self.batch_predict_with_confidence([pow_vector])[0]
+
+    def batch_predict(self, pow_vectors: list[list[float]] | np.ndarray) -> list[str]:
+        self._ensure_active()
+
+        model = self.active_model
+        features = np.asarray(pow_vectors, dtype=float)
+        return [str(prediction) for prediction in model.predict(features)]
 
     def batch_predict_with_confidence(
-        self, pow_vectors: List[List[float]]
-    ) -> List[Dict]:
-        if not self.active:
-            raise RuntimeError("No classifier selected")
-        return self.active.batch_predict_with_confidence(pow_vectors)
+        self, pow_vectors: list[list[float]]
+    ) -> list[dict[str, Any]]:
+        self._ensure_active()
+
+        model = self.active_model
+        features = np.asarray(pow_vectors, dtype=float)
+
+        if hasattr(model, "predict_proba"):
+            probabilities = model.predict_proba(features)
+            class_indices = np.argmax(probabilities, axis=1)
+
+            labels = model.classes_[class_indices]
+            confidences = probabilities[np.arange(len(probabilities)), class_indices]
+            return [
+                {"label": str(label), "confidence": float(confidence)}
+                for label, confidence in zip(labels, confidences)
+            ]
+
+        predictions = model.predict(features)
+        return [
+            {"label": str(prediction), "confidence": None} for prediction in predictions
+        ]
 
 
-__all__ = ["BaseClassifier", "ClassifierManager"]
+__all__ = ["ClassifierManager"]

@@ -116,7 +116,7 @@ def train_model(
 
     df = feather.read_feather(feather_path)
     # df = df.head(5000)
-    # df = df[df["subject_id"] < 5]
+    df = df[df["subject_id"] < 5]
     pow_data, labels, people = _collect_pow_features(df, pow_columns, num_classes)
     classifier_input_len = len(pow_data[0])
 
@@ -129,7 +129,7 @@ def train_model(
         pow_data,
         labels,
         model_path,
-        classifier_hyperparameters,
+        classifier_hyperparameters[classifier],
         num_classes,
         class_balancing,
         data_split_method,

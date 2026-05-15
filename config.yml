@@ -207,6 +207,7 @@ classifier_hyperparameters:
     gamma: "scale"
     class_weight: "balanced"
     random_state: 42
+    probability: True
   knn:
     n_neighbors: 5
     weights: "distance"
