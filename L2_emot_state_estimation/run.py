@@ -16,6 +16,8 @@ import pandas as pd
 
 from classifier import ClassifierManager
 from featureSelection import FeatureSelector
+from sklearn.metrics import accuracy_score, classification_report
+from utils import plot_confusion_matrix
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -182,6 +184,34 @@ def predict_from_file():
     predictions = classifier_manager.batch_predict_with_confidence(pow_vectors)
     output_frame = pd.DataFrame(predictions)
 
+    if "valence" in df.columns and "arousal" in df.columns:
+        true_valence = _set_va_range(df["valence"].tolist(), config["num_classes"])
+        true_arousal = _set_va_range(df["arousal"].tolist(), config["num_classes"])
+        true_labels = _va_to_label(true_valence, true_arousal)
+
+        predicted_valence = []
+        predicted_arousal = []
+        predicted_labels = []
+        for prediction in predictions:
+            label = prediction["label"]
+            predicted_labels.append(str(label))
+
+            va, ar = label.split("_")
+            predicted_valence.append(str(va))
+            predicted_arousal.append(str(ar))
+
+        print("Joint accuracy:", accuracy_score(true_labels, predicted_labels))
+        print("Valence accuracy:", accuracy_score(true_valence, predicted_valence))
+        print("Arousal accuracy:", accuracy_score(true_arousal, predicted_arousal))
+        print(classification_report(true_labels, predicted_labels, zero_division=0))
+        plot_confusion_matrix(true_labels, predicted_labels)
+
+        output_frame["true_label"] = true_labels
+        output_frame["true_valence"] = true_valence
+        output_frame["true_arousal"] = true_arousal
+        output_frame["pred_valence"] = predicted_valence
+        output_frame["pred_arousal"] = predicted_arousal
+
     output_file = _build_output_file(
         config["l2_output_folder"],
         config["pow_data_source"],
@@ -201,4 +231,6 @@ if __name__ == "__main__":
         predict_from_file()
 
     elif config["classifier_mode"] == "predict_from_queue":
-        raise NotImplementedError("predict_from_queue is still TODO")
+        raise Warning(
+            "predict_from_queue needs to be runned from main.py to access the L1 queue"
+        )
