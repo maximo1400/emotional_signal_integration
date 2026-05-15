@@ -12,6 +12,7 @@ import sys
 import time
 from pathlib import Path
 import queue
+import csv
 
 import pandas as pd
 
@@ -310,6 +311,8 @@ def predict_from_queue(pow_queue: queue.Queue):
             "POW_COLUMNS",
             "num_classes",
             "models_names",
+            "l2_output_folder",
+            "pow_data_source",
         ]
     )
     classifier = config["classifier"]
@@ -324,25 +327,57 @@ def predict_from_queue(pow_queue: queue.Queue):
         classifier,
     )
 
-    first_loop = True
-    while True:
-        row = pow_queue.get()
+    output_file = _build_output_file(
+        config["l2_output_folder"],
+        config["pow_data_source"],
+        filename="queue_predictions.csv",
+    )
 
-        if row is None:  # TODO - define a more robust stop signal
-            print("L2 queue received stop signal")
-            break
+    with output_file.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        first_loop = True
 
-        pow_values = _row_to_pow_values(row, pow_columns)
-        pow_vector = feat_select.process_data(pow_values)
+        while True:
+            row = pow_queue.get()
 
-        if first_loop:
-            classifier_manager = ClassifierManager(len(pow_vector))
-            classifier_manager.load(model_path, num_classes=config["num_classes"])
-            first_loop = False
+            if row is None:
+                print("L2 queue received stop signal")
+                break
 
-        prediction = classifier_manager.predict_with_confidence(pow_vector)
+            pow_values = _row_to_pow_values(row, pow_columns)
+            pow_vector = feat_select.process_data(pow_values)
 
-        print(f"label={prediction['label']}, confidence={prediction['confidence']}")
+
+            if first_loop:
+                feat_headers = [f"feat_{i}" for i in range(len(pow_vector))]
+                headers = [
+                    *feat_headers,
+                    "y_pred",
+                    "confidence",
+                    "timestamp",
+                ]
+                writer.writerow(headers)
+                classifier_manager = ClassifierManager(len(pow_vector))
+                classifier_manager.load(model_path, num_classes=config["num_classes"])
+                first_loop = False
+
+            timestamp = time.time()
+            prediction = classifier_manager.predict_with_confidence(pow_vector)
+            timestamp = time.time()
+
+            writer.writerow(
+                [
+                    *pow_vector,
+                    prediction["label"],
+                    prediction["confidence"],
+                    timestamp,
+                ]
+            )
+            f.flush()
+
+            print(f"label={prediction['label']}, confidence={prediction['confidence']}")
+
+    print(f"Saved queue predictions to {output_file}")
 
 
 if __name__ == "__main__":
