@@ -240,11 +240,12 @@ class ClassifierManager:
         if model_path:
             self.save_model(model_path)
 
-        print("Accuracy:", accuracy_score(y_test, y_pred))
-        print(classification_report(y_test, y_pred))
-        plot_confusion_matrix(y_test, y_pred)
-
-        return self.active_model
+        return {
+            "model": self.active_model,
+            "X_test": X_test,
+            "y_test": y_test,
+            "y_pred": np.asarray(y_pred),
+        }
 
     def predict(self, pow_vector: list[float]) -> str:
         return self.batch_predict([pow_vector])[0]

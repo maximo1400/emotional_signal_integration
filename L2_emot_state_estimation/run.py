@@ -104,6 +104,7 @@ def train_model():
             "num_classes",
             "models_folder",
             "models_names",
+            "l2_output_folder",
             "class_balancing",
             "data_split_method",
             "data_split_parameters",
@@ -130,7 +131,7 @@ def train_model():
         classifier,
     )
 
-    classifier_manager.train(
+    train_result = classifier_manager.train(
         classifier,
         pow_vectors,
         labels,
@@ -142,6 +143,62 @@ def train_model():
         config["data_split_parameters"],
         people,
     )
+
+    true_labels = train_result["y_test"]
+    predictions = train_result["y_pred"]
+
+    predicted_valence = []
+    predicted_arousal = []
+    predicted_labels = []
+    for prediction in predictions:
+        label = prediction["label"]
+        predicted_labels.append(str(label))
+
+        va, ar = label.split("_")
+        predicted_valence.append(str(va))
+        predicted_arousal.append(str(ar))
+
+    true_valence = []
+    true_arousal = []
+    for label in true_labels:
+        va, ar = label.split("_")
+        true_valence.append(str(va))
+        true_arousal.append(str(ar))
+
+    print("Joint accuracy:", accuracy_score(true_labels, predicted_labels))
+    print("Valence accuracy:", accuracy_score(true_valence, predicted_valence))
+    print("Arousal accuracy:", accuracy_score(true_arousal, predicted_arousal))
+    print(classification_report(true_labels, predicted_labels, zero_division=0))
+    plot_confusion_matrix(true_labels, predicted_labels)
+
+    output_frame = pd.DataFrame(predictions)
+    output_frame["true_label"] = true_labels
+    output_frame["true_valence"] = true_valence
+    output_frame["true_arousal"] = true_arousal
+    output_frame["pred_valence"] = predicted_valence
+    output_frame["pred_arousal"] = predicted_arousal
+
+    output_file = _build_output_file(
+        config["l2_output_folder"],
+        "train",
+        filename="test_predictions.csv",
+    )
+
+    output_frame.to_csv(output_file, index=False)
+
+    report_file = output_file.with_name("evaluation.txt")
+    report_file.write_text(
+        "\n".join(
+            [
+                f"Joint accuracy: {accuracy_score(true_labels, predicted_labels):.4f}",
+                classification_report(true_labels, predicted_labels, zero_division=0),
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    print(f"Saved train/test comparison to {output_file}")
+    print(f"Saved evaluation report to {report_file}")
 
 
 def predict_from_file():
