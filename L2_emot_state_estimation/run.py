@@ -347,7 +347,6 @@ def predict_from_queue(pow_queue: queue.Queue):
             pow_values = _row_to_pow_values(row, pow_columns)
             pow_vector = feat_select.process_data(pow_values)
 
-
             if first_loop:
                 feat_headers = [f"feat_{i}" for i in range(len(pow_vector))]
                 headers = [

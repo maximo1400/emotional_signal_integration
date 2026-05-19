@@ -17,12 +17,9 @@ import joblib
 import numpy as np
 import warnings
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-
-from utils import plot_confusion_matrix
 
 
 CLASSIFIERS = {
