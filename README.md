@@ -35,8 +35,12 @@ pip install -r requirements.txt
 2) Configure `config.yml` as needed (e.g., choose `pow_data_source`, set sequences, etc.).
 
 3) If using the virtual simulator, ensure you have the necessary data files in `L1_band_power_capture/Simulated_pow/Data/Dreamer`. 
-- Get access to the [Dreamer](https://zenodo.org/records/546113) [![DOI](https://zenodo.org/badge/DOI/10.1109/JBHI.2017.2688239.svg)](https://doi.org/10.1109/JBHI.2017.2688239)
+- Get access to the [Dreamer](https://zenodo.org/records/546113) 
  dataset and place the relevant `.mat` files in that directory.
+- Convert the raw `.mat` data into the band-power `.feather` file expected by the simulator by running the DB adaptation script from the project root:
+  ```bash
+  python L1_band_power_capture/Simulated_pow/DB_adaptation/run_adaptation.py
+  ```
 
 4) If using the Emotiv device, ensure you have the necessary hardware set up and  add yor app credentials in `.env` file, it should look like:
 ```.env

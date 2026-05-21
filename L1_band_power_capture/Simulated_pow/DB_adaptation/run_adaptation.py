@@ -1,5 +1,4 @@
 import sys
-import pandas as pd
 from pathlib import Path
 
 # Add root directory to sys.path to resolve imports regardless of where script is executed
