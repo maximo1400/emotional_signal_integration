@@ -76,7 +76,6 @@ class FeatureSelector:
         self.sensor_info = {}
         self.col_index = {}
         self.asymmetries = []
-        self.pow = []
         self.eps = 1e-10
         self.pow_columns_mask_np = np.asarray([], dtype=bool)
 
@@ -129,9 +128,6 @@ class FeatureSelector:
 
         data = pow_arr[self.pow_columns_mask_np].tolist()
         data.extend(self.add_features(pow_arr))
-
-        row = data + [time.time()]
-        self.pow.append(row)
 
         return data
 
@@ -446,7 +442,6 @@ class FeatureSelector:
                 idx = self.sensor_band_indices.get((sensor, band))
                 vals.append(pow_data[idx])
 
-
             vals = np.maximum(vals, self.eps)
             probs = vals / (np.sum(vals) + self.eps)
 
@@ -544,7 +539,7 @@ class FeatureSelector:
                 return float(self.BAND_CENTERS[band])
 
         return float(self.BAND_CENTERS[items[-1][0]])
-    
+
     # TODO: check if this makes sense
     def calc_diffuse_slowing_proxy(self, pow_data) -> float:
         """

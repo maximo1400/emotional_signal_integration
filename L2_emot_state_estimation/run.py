@@ -348,9 +348,9 @@ def predict_from_queue(pow_queue: queue.Queue):
             pow_vector = feat_select.process_data(pow_values)
 
             if first_loop:
-                feat_headers = [f"feat_{i}" for i in range(len(pow_vector))]
+                features = feat_select.get_final_feature_names()
                 headers = [
-                    *feat_headers,
+                    *features,
                     "y_pred",
                     "confidence",
                     "timestamp",
@@ -360,7 +360,6 @@ def predict_from_queue(pow_queue: queue.Queue):
                 classifier_manager.load(model_path, num_classes=config["num_classes"])
                 first_loop = False
 
-            timestamp = time.time()
             prediction = classifier_manager.predict_with_confidence(pow_vector)
             timestamp = time.time()
 
