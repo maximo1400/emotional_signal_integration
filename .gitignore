@@ -210,7 +210,7 @@ __marimo__/
 torcheeg/
 .torcheeg/
 L1_band_power_capture/Simulated_pow/Data/Dreamer/dreamer_bandpower_frames.feather
-L1_band_power_capture/Simulated_pow/Data/Dreamer/dreamer_eeg.feather
+L1_band_power_capture/Simulated_pow/Data/Dreamer/pow.feather
 L1_band_power_capture/Simulated_pow/Data/Dreamer/DREAMER.mat
 L1_band_power_capture/Simulated_pow/Data/Virtual/dummy_pow.feather
 
