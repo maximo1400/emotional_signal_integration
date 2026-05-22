@@ -2,46 +2,27 @@ import time
 import pandas
 import pyarrow.feather as feather
 import queue
+import sys
 from pathlib import Path
-import yaml
 import matplotlib.pyplot as plt
 
-# fmt: off
-FILE_PATH = "L1_band_power_capture/Simulated_pow/Data/Dreamer/dreamer_bandpower_frames.feather"
-YAML_PATH = "config.yml"
-POW_COLUMNS = [
-        "AF3/theta", "AF3/alpha", "AF3/betaL", "AF3/betaH", "AF3/gamma",
-        "F7/theta",  "F7/alpha",  "F7/betaL",  "F7/betaH",  "F7/gamma",
-        "F3/theta",  "F3/alpha",  "F3/betaL",  "F3/betaH",  "F3/gamma",
-        "FC5/theta", "FC5/alpha", "FC5/betaL", "FC5/betaH", "FC5/gamma",
-        "T7/theta",  "T7/alpha",  "T7/betaL",  "T7/betaH",  "T7/gamma",
-        "P7/theta",  "P7/alpha",  "P7/betaL",  "P7/betaH",  "P7/gamma",
-        "O1/theta",  "O1/alpha",  "O1/betaL",  "O1/betaH",  "O1/gamma",
-        "O2/theta",  "O2/alpha",  "O2/betaL",  "O2/betaH",  "O2/gamma",
-        "P8/theta",  "P8/alpha",  "P8/betaL",  "P8/betaH",  "P8/gamma",
-        "T8/theta",  "T8/alpha",  "T8/betaL",  "T8/betaH",  "T8/gamma",
-        "FC6/theta", "FC6/alpha", "FC6/betaL", "FC6/betaH", "FC6/gamma",
-        "F4/theta",  "F4/alpha",  "F4/betaL",  "F4/betaH",  "F4/gamma",
-        "F8/theta",  "F8/alpha",  "F8/betaL",  "F8/betaH",  "F8/gamma",
-        "AF4/theta", "AF4/alpha", "AF4/betaL", "AF4/betaH", "AF4/gamma"]
-EMOTIV_POW_FREC = 8  # Hz
-
-# fmt: on
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from config_loader import get_config
 
 
 class EmotionSimulator:
-    file_path = FILE_PATH
+    file_path = None
     emotion_range = None
     emot_states_area = {}
     sequences = {}
     sequence = []
     sub_id = None
-    data_frec = EMOTIV_POW_FREC  # Hz
+    data_frec = None
     data: pandas.DataFrame = None
     out_queue: queue.Queue = None
     output_df: pandas.DataFrame = None
     output_rows = []
-    emotiv_columns = POW_COLUMNS
+    emotiv_columns = []
     emot_states = []
     pow_by_state = {}
     pow_read = {}
@@ -55,25 +36,38 @@ class EmotionSimulator:
         self.get_emotion_pow()
         print("Emotion Simulator initialized.")
 
-    def load_yml_config(self, path: str | Path = YAML_PATH) -> dict | list:
-        """Parse a YAML file and return the Python object it represents."""
-        path = Path(path).expanduser()
-        try:
-            yml_data = yaml.safe_load(path.read_text(encoding="utf-8"))
-            emot_states = yml_data["emotional_states_areas"]
-            for state in emot_states:
-                id = state["id"]
-                label = state["label"]
-                emot_range = state["range"]
-                va = (emot_range["valence_min"], emot_range["valence_max"])
-                ar = (emot_range["arousal_min"], emot_range["arousal_max"])
-                self.emot_states_area[id] = {"label": label, "va": va, "ar": ar}
-            self.sequences = yml_data["sequences"]
-            self.sub_id = yml_data["sub_id"]
-            self.emotion_range = yml_data["emotion_range"]
-            self.transition_duration = yml_data["transition_duration"]
-        except yaml.YAMLError as e:
-            raise RuntimeError(f"Invalid YAML in {path}: {e}")
+    def load_yml_config(self):
+        """Parse config file and return the Python object it represents."""
+        config = get_config(
+            [
+                "feather_file_path",
+                "POW_COLUMNS",
+                "emotional_states_areas",
+                "sequences",
+                "sub_id",
+                "emotion_range",
+                "transition_duration",
+                "emotiv_pow_frec",
+            ]
+        )
+        
+        self.file_path = config["feather_file_path"]
+        self.emotiv_columns = config["POW_COLUMNS"]
+        self.data_frec = config["emotiv_pow_frec"]
+        
+        emot_states = config["emotional_states_areas"]
+        for state in emot_states:
+            id = state["id"]
+            label = state["label"]
+            emot_range = state["range"]
+            va = (emot_range["valence_min"], emot_range["valence_max"])
+            ar = (emot_range["arousal_min"], emot_range["arousal_max"])
+            self.emot_states_area[id] = {"label": label, "va": va, "ar": ar}
+            
+        self.sequences = config["sequences"]
+        self.sub_id = config["sub_id"]
+        self.emotion_range = config["emotion_range"]
+        self.transition_duration = config["transition_duration"]
 
     def load_pow_data(self):
         "Loads the power data from the feather file, normalizes the valence and arousal values to the defined emotion range and stores it in self.data."
