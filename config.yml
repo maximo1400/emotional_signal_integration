@@ -245,3 +245,22 @@ data_split_parameters:
     random_state: 42  # Random seed for reproducibility (used if data_split_method is "random")
   subject:
     test_subjects: [4]  # List of subject IDs to use for testing (used if data_split_method is "subject")
+
+
+## Layer 3: Data Adaptation Configuration
+
+# Smoothing algorithm options: "rolling_buffer", "ema" (Exponential Moving Average)
+smoothing_method: "ema"
+
+# Configurations for the smoothing algorithms
+smoothing_parameters:
+  rolling_buffer:
+    window_size: 8  # For 8Hz, 8 frames is 1 second of data
+  ema: # Exponential Moving Average
+    alpha: 0.2  # Smoothing factor between 0 and 1. Lower means more smoothing.
+
+# Socket configuration for outputting the smoothed data
+socket_config:
+  host: "127.0.0.1"
+  port: 65432
+  protocol: "tcp" 

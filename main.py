@@ -6,6 +6,8 @@ import signal
 from dotenv import load_dotenv
 from L1_band_power_capture.Emotiv.Emotiv import Subcribe
 from L1_band_power_capture.Simulated_pow.EmotionSimulator import EmotionSimulator
+from L2_emot_state_estimation.run import predict_from_queue
+from L3_va_data_adaptation.run import run_l3
 from config_loader import get_config
 
 load_dotenv()
@@ -30,11 +32,30 @@ def monitor_stop(emotiv, stop_event):
 
 def main() -> None:
     config = get_config(
-        ["pow_data_source", "L1_output_folder", "emotiv_streams", "profile_name"]
+        [
+            "pow_data_source",
+            "L1_output_folder",
+            "emotiv_streams",
+            "profile_name",
+            "classifier_mode",
+        ]
     )
 
     # L1
     l1_out = queue.Queue()
+    l2_out = queue.Queue()
+    classifier_mode = config["classifier_mode"]
+
+    if classifier_mode == "predict_from_queue":
+        # Start L3 thread
+        l3_thread = threading.Thread(target=run_l3, args=(l2_out,), daemon=True)
+        l3_thread.start()
+
+        # Start L2 thread
+        l2_thread = threading.Thread(
+            target=predict_from_queue, args=(l1_out, l2_out), daemon=True
+        )
+        l2_thread.start()
     if config["pow_data_source"] == "virtual":
         # Virtual data source logic
         simulator = EmotionSimulator(l1_out)

@@ -303,7 +303,7 @@ def predict_from_file():
     print(f"Saved evaluation report to {report_file}")
 
 
-def predict_from_queue(pow_queue: queue.Queue):
+def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None):
     config = get_config(
         [
             "models_folder",
@@ -372,6 +372,13 @@ def predict_from_queue(pow_queue: queue.Queue):
                 ]
             )
             f.flush()
+
+            if l2_out_queue is not None:
+                l2_out_queue.put({
+                    "label": prediction["label"],
+                    "confidence": prediction["confidence"],
+                    "timestamp": timestamp
+                })
 
             print(f"label={prediction['label']}, confidence={prediction['confidence']}")
 
