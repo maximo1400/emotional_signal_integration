@@ -311,6 +311,7 @@ def predict_from_file(l2_out_queue: queue.Queue):
                     "timestamp": time.time(),
                 }
             )
+        l2_out_queue.put(None)  # Signal to L3 that predictions are done
     else:
         print("No L2 output queue provided, skipping sending predictions to L3")
 
@@ -354,6 +355,7 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
 
             if row is None:
                 print("L2 queue received stop signal")
+                l2_out_queue.put(None)  # Signal to L3 that predictions are done
                 break
 
             pow_values = _row_to_pow_values(row, pow_columns)

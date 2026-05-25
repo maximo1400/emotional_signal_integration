@@ -50,11 +50,11 @@ class EmotionSimulator:
                 "emotiv_pow_frec",
             ]
         )
-        
+
         self.file_path = config["feather_file_path"]
         self.emotiv_columns = config["POW_COLUMNS"]
         self.data_frec = config["emotiv_pow_frec"]
-        
+
         emot_states = config["emotional_states_areas"]
         for state in emot_states:
             id = state["id"]
@@ -63,7 +63,7 @@ class EmotionSimulator:
             va = (emot_range["valence_min"], emot_range["valence_max"])
             ar = (emot_range["arousal_min"], emot_range["arousal_max"])
             self.emot_states_area[id] = {"label": label, "va": va, "ar": ar}
-            
+
         self.sequences = config["sequences"]
         self.sub_id = config["sub_id"]
         self.emotion_range = config["emotion_range"]
@@ -157,6 +157,7 @@ class EmotionSimulator:
             state = input(msg)
             if state == "q":
                 self.finalize_output_df()
+                self.out_queue.put(None)  # Signal to any consumer that we're done
                 break
             msg = self.decode_msg_num(int(state))
             if msg in self.sequences.keys():

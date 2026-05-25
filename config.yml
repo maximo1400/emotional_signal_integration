@@ -162,6 +162,9 @@ epoch_sensors:
 ## Layer 2: Data Processing Configuration
 l2_output_folder: "L2_emot_state_estimation/output_data"  # Folder path to save the processed data from Layer 2
 
+## Layer 3: Data Adaptation Configuration
+l3_output_folder: "L3_va_data_adaptation/output_data"  # Folder path to save the processed data from Layer 3
+
 ## Feature selection configuration for Layer 2
 # If it's needed, you can specify wich pow_column you wish to use for the classifier in layer 2. 
 # If empty, all columns will be used.
@@ -191,7 +194,7 @@ classifier: "random_forest"  # Classifier to use for emotion state estimation in
 # - "train": Train the classifier using the processed data from DREAMER.
 # - "predict_from_queue": Load a trained model from file and use it to make predictions on incoming data from L1 queue.
 # - "predict_from_file": Load a trained model from file and use it to make predictions on selected data.
-classifier_mode: "train"
+classifier_mode: "predict_from_queue"
 # If classifier_mode is set to "predict_from_file", specify the 'pow' CSV file from L1 output to use for making predictions. 
 # This should be a path to a specific CSV file containing the power features extracted by L1.
 predict_from_file_pow_csv_path: "L1_band_power_capture/output_data/emotiv/pow.csv"  # Path to the 'pow' CSV file from L1 output for making predictions (used if classifier_mode is "predict_from_file")
