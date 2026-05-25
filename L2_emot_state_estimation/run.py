@@ -16,10 +16,10 @@ import csv
 
 import pandas as pd
 
-from classifier import ClassifierManager
-from featureSelection import FeatureSelector
+from L2_emot_state_estimation.classifier import ClassifierManager
+from L2_emot_state_estimation.featureSelection import FeatureSelector
+from L2_emot_state_estimation.utils import plot_confusion_matrix
 from sklearn.metrics import accuracy_score, classification_report
-from utils import plot_confusion_matrix
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -228,7 +228,7 @@ def train_model():
     print(f"Saved evaluation report to {report_file}")
 
 
-def predict_from_file():
+def predict_from_file(l2_out_queue: queue.Queue):
     config = get_config(
         [
             "models_folder",
@@ -302,6 +302,18 @@ def predict_from_file():
     print(f"Saved predictions to {output_file}")
     print(f"Saved evaluation report to {report_file}")
 
+    if l2_out_queue is not None:
+        for prediction in predictions:
+            l2_out_queue.put(
+                {
+                    "label": prediction["label"],
+                    "confidence": prediction["confidence"],
+                    "timestamp": time.time(),
+                }
+            )
+    else:
+        print("No L2 output queue provided, skipping sending predictions to L3")
+
 
 def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None):
     config = get_config(
@@ -374,27 +386,28 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
             f.flush()
 
             if l2_out_queue is not None:
-                l2_out_queue.put({
-                    "label": prediction["label"],
-                    "confidence": prediction["confidence"],
-                    "timestamp": timestamp
-                })
+                l2_out_queue.put(
+                    {
+                        "label": prediction["label"],
+                        "confidence": prediction["confidence"],
+                        "timestamp": timestamp,
+                    }
+                )
+            else:
+                print("No L2 output queue provided, skipping sending predictions to L3")
 
             print(f"label={prediction['label']}, confidence={prediction['confidence']}")
 
     print(f"Saved queue predictions to {output_file}")
 
 
-if __name__ == "__main__":
+def run_l2(l1_queue: queue.Queue = None, l2_out_queue: queue.Queue = None):
     config = get_config(["classifier_mode"])
+    mode = config["classifier_mode"]
 
-    if config["classifier_mode"] == "train":
+    if mode == "train":
         train_model()
-
-    elif config["classifier_mode"] == "predict_from_file":
-        predict_from_file()
-
-    elif config["classifier_mode"] == "predict_from_queue":
-        raise NotImplementedError(
-            "predict_from_queue needs to be runned from main.py to access the L1 queue"
-        )
+    elif mode == "predict_from_file":
+        predict_from_file(l2_out_queue)
+    elif mode == "predict_from_queue":
+        predict_from_queue(l1_queue, l2_out_queue)

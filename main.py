@@ -1,27 +1,30 @@
 import threading
 import queue
 from L1_band_power_capture.run import run_l1
-from L2_emot_state_estimation.run import predict_from_queue
+from L2_emot_state_estimation.run import run_l2
 from L3_va_data_adaptation.run import run_l3
 from config_loader import get_config
 
 
 def main() -> None:
-    classifier_mode = get_config(["classifier_mode"])
     l1_out = queue.Queue()
     l2_out = queue.Queue()
 
-    if classifier_mode == "predict_from_queue":
-        # Start L3 thread
+    config = get_config(["classifier_mode"])
+    classifier_mode = config["classifier_mode"]
+
+    if classifier_mode == "train":
+        run_l2(l1_out, l2_out)
+
+    if classifier_mode in ["predict_from_queue", "predict_from_file"]:
+        l2_thread = threading.Thread(target=run_l2, args=(l1_out, l2_out), daemon=True)
+        l2_thread.start()
+
         l3_thread = threading.Thread(target=run_l3, args=(l2_out,), daemon=True)
         l3_thread.start()
 
-        # Start L2 thread
-        l2_thread = threading.Thread(
-            target=predict_from_queue, args=(l1_out, l2_out), daemon=True
-        )
-        l2_thread.start()
-    run_l1(l1_out)
+    if classifier_mode == "predict_from_queue":
+        run_l1(l1_out)
 
 
 if __name__ == "__main__":
