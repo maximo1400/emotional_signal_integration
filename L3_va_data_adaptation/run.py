@@ -2,7 +2,6 @@ import sys
 import queue
 import socket
 import json
-import logging
 import threading
 import csv
 import time
@@ -12,8 +11,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_loader import get_config
 from L3_va_data_adaptation.smoother import DataSmoother
-
-logger = logging.getLogger(__name__)
 
 
 def parse_label(label_str: str) -> tuple[float, float]:

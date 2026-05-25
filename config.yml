@@ -252,7 +252,13 @@ data_split_parameters:
 
 ## Layer 3: Data Adaptation Configuration
 
-# Smoothing algorithm options: "rolling_buffer", "ema" (Exponential Moving Average)
+# Smoothing algorithm options: 
+# - "rolling_buffer" 
+# - "ema" (Exponential Moving Average)
+# - steps: keeps values in the DREAMER class domain (integer 1..5) and limits
+#   the per-update class jump using max_step_delta (e.g., 1->2 with delta 1,
+#   1->3 with delta 2, but not 1->5 if max_step_delta is 2)
+# - "none" (no smoothing)
 smoothing_method: "ema"
 
 # Configurations for the smoothing algorithms
@@ -261,6 +267,8 @@ smoothing_parameters:
     window_size: 8  # For 8Hz, 8 frames is 1 second of data
   ema: # Exponential Moving Average
     alpha: 0.2  # Smoothing factor between 0 and 1. Lower means more smoothing.
+  steps:
+    max_step_delta: 1  # Max class jump per update (1=adjacent, 2=can skip one)
 
 # Socket configuration for outputting the smoothed data
 socket_config:

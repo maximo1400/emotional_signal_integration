@@ -1,7 +1,4 @@
-import logging
 from collections import deque
-
-logger = logging.getLogger(__name__)
 
 
 class DataSmoother:
@@ -20,10 +17,15 @@ class DataSmoother:
             self.alpha = self.params["alpha"]
             self.last_v = None
             self.last_a = None
+        elif self.method == "steps":
+            # For "steps", we will round to nearest integer and only allow adjacent moves
+            self.max_step_delta = self.params["max_step_delta"]
+            self.last_v = None
+            self.last_a = None
+        elif self.method == "none":
+            pass  # No initialization needed for no smoothing
         else:
-            logger.warning(
-                f"Unknown smoothing method '{self.method}'. Falling back to no smoothing."
-            )
+            raise ValueError(f"Unsupported smoothing method: {self.method}")
 
     def smooth(self, v: float, a: float) -> tuple[float, float]:
         """Applies the configured smoothing algorithm to the valence and arousal values."""
@@ -47,6 +49,24 @@ class DataSmoother:
                 self.last_v = self.alpha * v + (1 - self.alpha) * self.last_v
                 self.last_a = self.alpha * a + (1 - self.alpha) * self.last_a
             return self.last_v, self.last_a
+
+        elif self.method == "steps":
+            if self.last_v is None:
+                self.last_v, self.last_a = v, a
+
+            else:
+                # Only allow adjacent moves
+                if abs(v - self.last_v) > self.max_step_delta:
+                    v = self.last_v + self.max_step_delta * (
+                        1 if v > self.last_v else -1
+                    )
+                if abs(a - self.last_a) > self.max_step_delta:
+                    a = self.last_a + self.max_step_delta * (
+                        1 if a > self.last_a else -1
+                    )
+
+                self.last_v, self.last_a = v, a
+            return float(self.last_v), float(self.last_a)
 
         # No smoothing fallback
         return v, a
