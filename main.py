@@ -11,15 +11,17 @@ def main() -> None:
     l1_out = queue.Queue()
     l2_out = queue.Queue()
 
-    config = get_config(["classifier_mode"])
+    config = get_config(["classifier_mode", "start_socket_listener"])
     classifier_mode = config["classifier_mode"]
+    start_socket_listener = config["start_socket_listener"]
 
     if classifier_mode == "train":
         run_l2(l1_out, l2_out)
 
     if classifier_mode in ["predict_from_queue", "predict_from_file"]:
-        l3_listener_thread = threading.Thread(target=run_l3_listener, daemon=True)
-        l3_listener_thread.start()
+        if start_socket_listener:
+            l3_listener_thread = threading.Thread(target=run_l3_listener, daemon=True)
+            l3_listener_thread.start()
 
         l3_thread = threading.Thread(target=run_l3, args=(l2_out,), daemon=True)
         l3_thread.start()

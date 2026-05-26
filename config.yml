@@ -3,6 +3,10 @@
 # Debugging configuration
 # Verbose printing for debugging
 verbose: False
+# Whether to start the separate L3 socket listener process/thread.
+# Set this to false if running external listener.
+# 1 socket listener is requied for the current L3 implementation
+start_socket_listener: True
 
 # Layer 1: Data Source Configuration
 
@@ -166,9 +170,6 @@ epoch_sensors:
 ## Layer 2: Data Processing Configuration
 l2_output_folder: "L2_emot_state_estimation/output_data"  # Folder path to save the processed data from Layer 2
 
-## Layer 3: Data Adaptation Configuration
-l3_output_folder: "L3_va_data_adaptation/output_data"  # Folder path to save the processed data from Layer 3
-
 ## Feature selection configuration for Layer 2
 # If it's needed, you can specify wich pow_column you wish to use for the classifier in layer 2. 
 # If empty, all columns will be used.
@@ -255,6 +256,7 @@ data_split_parameters:
 
 
 ## Layer 3: Data Adaptation Configuration
+l3_output_folder: "L3_va_data_adaptation/output_data"  # Folder path to save the processed data from Layer 3
 
 # Smoothing algorithm options: 
 # - "rolling_buffer" 
