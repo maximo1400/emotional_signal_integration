@@ -20,8 +20,10 @@ def parse_label(label_str: str) -> tuple[float, float]:
 
 
 def run_l3(l2_out_queue: queue.Queue):
-    config = get_config(["smoothing_method", "smoothing_parameters", "socket_config"])
-
+    config = get_config(
+        ["smoothing_method", "smoothing_parameters", "socket_config", "verbose"]
+    )
+    verbose = config["verbose"]
     method = config["smoothing_method"]
     params = config["smoothing_parameters"][method]
     smoother = DataSmoother(method, params)
@@ -43,7 +45,6 @@ def run_l3(l2_out_queue: queue.Queue):
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind((host, port))
         server_socket.listen(1)
-        print(f"Waiting for TCP connection on {host}:{port}...")
         conn, addr = server_socket.accept()
         print(f"Connected by {addr}")
 
@@ -57,7 +58,6 @@ def run_l3(l2_out_queue: queue.Queue):
         addr = (host, port)
 
     try:
-        print(f"L3 writing output to {output_file}")
         with output_file.open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(
@@ -74,7 +74,8 @@ def run_l3(l2_out_queue: queue.Queue):
             while True:
                 data = l2_out_queue.get()
                 if data is None:
-                    print("L3 queue received stop signal")
+                    if verbose:
+                        print("L3 queue received stop signal")
                     break
 
                 raw_v, raw_a = parse_label(str(data["label"]))
@@ -118,6 +119,8 @@ def run_l3(l2_out_queue: queue.Queue):
                         while not l2_out_queue.empty():
                             l2_out_queue.get_nowait()
     finally:
+        if verbose:
+            print(f"L3 saved output to {output_file}")
         if protocol == "tcp" and "conn" in locals() and conn != server_socket:
             conn.close()
         server_socket.close()

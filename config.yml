@@ -1,5 +1,9 @@
 # Configuration file for the Emotiv data simulation and processing pipeline
 
+# Debugging configuration
+# Verbose printing for debugging
+verbose: False
+
 # Layer 1: Data Source Configuration
 
 # Choose the data source for the pipeline. Options:
@@ -255,11 +259,11 @@ data_split_parameters:
 # Smoothing algorithm options: 
 # - "rolling_buffer" 
 # - "ema" (Exponential Moving Average)
-# - steps: keeps values in the DREAMER class domain (integer 1..5) and limits
+# - "steps": keeps values in the DREAMER class domain (integer 1..5) and limits
 #   the per-update class jump using max_step_delta (e.g., 1->2 with delta 1,
 #   1->3 with delta 2, but not 1->5 if max_step_delta is 2)
 # - "none" (no smoothing)
-smoothing_method: "ema"
+smoothing_method: "steps"
 
 # Configurations for the smoothing algorithms
 smoothing_parameters:

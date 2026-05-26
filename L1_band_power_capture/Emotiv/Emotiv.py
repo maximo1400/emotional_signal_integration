@@ -164,11 +164,13 @@ class Subcribe:
 
     # callbacks functions
     def on_create_session_done(self, *args, **kwargs):
-        print("on_create_session_done")
+        if self.verbose:
+            print("on_create_session_done")
         self.c.query_profile()
 
     def on_query_profile_done(self, *args, **kwargs):
-        print("on_query_profile_done")
+        if self.verbose:
+            print("on_query_profile_done")
         self.profile_lists = kwargs.get("data")
         if self.profile_name in self.profile_lists:
             # the profile is existed
@@ -185,26 +187,30 @@ class Subcribe:
             # self.subscribe_data(["sys"])
             self.subscribe_data(self.streams)
         else:
-            print("The profile " + self.profile_name + " is unloaded")
+            if self.verbose:
+                print("The profile " + self.profile_name + " is unloaded")
             self.profile_name = ""
             # close socket
             self.c.close()
 
     def on_save_profile_done(self, *args, **kwargs):
-        print("Save profile " + self.profile_name + " successfully.")
+        if self.verbose:
+            print("Save profile " + self.profile_name + " successfully.")
         # You can test some advanced bci such as active actions, brain map, and training threshold. before unload profile
         self.unload_profile(self.profile_name)
 
     def on_new_data_labels(self, *args, **kwargs):
         data = kwargs.get("data")
-        print("on_new_data_labels")
+        if self.verbose:
+            print("on_new_data_labels")
         # print(data)
         # Records data
         stream_name = data["streamName"]
         stream_labels = data["labels"]
         if stream_name in ["eeg", "com", "fac", "mot", "met", "pow", "sys", "dev"]:
             stream_labels += ["timestamp"]
-        print("**New Dataset**")
+        if self.verbose:
+            print("**New Dataset**")
         if stream_name != "eeg":
             self.data[stream_name] = pd.DataFrame(columns=stream_labels)
         else:
@@ -338,9 +344,9 @@ class Subcribe:
         self.data["pow"].loc[len(self.data["pow"])] = pow_data
         self.queue.put(data)
         mean_pow = sum(data["pow"]) / len(data["pow"])
-        print(f"pow data put in queue, mean pow: {mean_pow}")
 
         if self.verbose:
+            print(f"pow data put in queue, mean pow: {mean_pow}")
             print("pow data: {}".format(data))
 
     def on_new_com_data(self, *args, **kwargs):

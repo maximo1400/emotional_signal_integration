@@ -56,6 +56,7 @@ def run_l1(l1_out_queue: queue.Queue):
             "L1_output_folder",
             "emotiv_streams",
             "profile_name",
+            "verbose",
         ]
     )
 
@@ -82,7 +83,7 @@ def run_l1(l1_out_queue: queue.Queue):
     emotiv = Subcribe(
         emotiv_client_id,
         emotiv_client_secret,
-        verbose=False,
+        verbose=config["verbose"],
         emotiv_profile=profile_name,
     )
 

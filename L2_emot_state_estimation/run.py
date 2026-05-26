@@ -326,8 +326,10 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
             "models_names",
             "l2_output_folder",
             "pow_data_source",
+            "verbose",
         ]
     )
+    verbose = config["verbose"]
     classifier = config["classifier"]
     pow_columns = config["POW_COLUMNS"]
 
@@ -399,8 +401,8 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
                 print("No L2 output queue provided, skipping sending predictions to L3")
 
             print(f"label={prediction['label']}, confidence={prediction['confidence']}")
-
-    print(f"Saved queue predictions to {output_file}")
+    if verbose:
+        print(f"Saved queue predictions to {output_file}")
 
 
 def run_l2(l1_queue: queue.Queue = None, l2_out_queue: queue.Queue = None):
