@@ -32,9 +32,11 @@ def _signal_handler(stop_event: threading.Event, *_):
     stop_event.set()
 
 
-def _monitor_stop(emotiv, stop_event: threading.Event):
+def _monitor_stop(emotiv, stop_event: threading.Event, l1_out_queue: queue.Queue):
     while not stop_event.is_set():
         time.sleep(0.1)
+    # print("Closing Emotiv connection...")
+    l1_out_queue.put(None)
     emotiv.c.close()
 
 
@@ -86,13 +88,15 @@ def run_l1(l1_out_queue: queue.Queue):
 
     monitor_thread = threading.Thread(
         target=_monitor_stop,
-        args=(emotiv, stop_event),
+        args=(emotiv, stop_event, l1_out_queue),
         daemon=True,
     )
     monitor_thread.start()
 
     t0 = time.time()
-    t = threading.Thread(target=emotiv.start, args=[profile_name, streams, l1_out_queue])
+    t = threading.Thread(
+        target=emotiv.start, args=[profile_name, streams, l1_out_queue]
+    )
 
     t.start()
     while t.is_alive():

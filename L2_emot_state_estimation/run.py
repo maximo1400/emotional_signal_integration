@@ -27,11 +27,11 @@ from config_loader import get_config
 
 
 def _row_to_pow_values(row, pow_columns: list[str]) -> list[float]:
+    if isinstance(row, dict):
+        row = row["pow"]
+
     if isinstance(row, pd.Series):
         return row.reindex(pow_columns).tolist()
-
-    if isinstance(row, dict):
-        return [row[column] for column in pow_columns]
 
     return list(row)
 
