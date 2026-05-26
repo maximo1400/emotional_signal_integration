@@ -26,7 +26,7 @@ def run_l3_listener() -> None:
     port = sock_cfg["port"]
     protocol = sock_cfg["protocol"].lower()
 
-    print(f"L3 listener starting on {host}:{port} ({protocol})")
+    print(f"Socket listener starting on {host}:{port} ({protocol})")
 
     if protocol == "tcp":
         sock = _connect_tcp(host, port)
@@ -45,9 +45,9 @@ def run_l3_listener() -> None:
                         continue
                     try:
                         payload = json.loads(line)
-                        print(f"L3 socket payload: {payload}")
+                        print(f"Socket payload: {payload}\n")
                     except json.JSONDecodeError:
-                        print(f"L3 socket raw: {line}")
+                        print(f"socket raw: {line}")
     else:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((host, port))
@@ -59,9 +59,9 @@ def run_l3_listener() -> None:
                     continue
                 try:
                     payload = json.loads(line)
-                    print(f"L3 socket payload from {addr}: {payload}")
+                    print(f"socket payload from {addr}: {payload}")
                 except json.JSONDecodeError:
-                    print(f"L3 socket raw from {addr}: {line}")
+                    print(f"socket raw from {addr}: {line}")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ verbose: False
 # Set this to false if running external listener.
 # 1 socket listener is requied for the current L3 implementation
 start_socket_listener: True
+# Save output files from each layer
+save_output_files: True
 
 # Layer 1: Data Source Configuration
 

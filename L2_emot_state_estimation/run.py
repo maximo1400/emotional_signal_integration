@@ -356,7 +356,8 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
             row = pow_queue.get()
 
             if row is None:
-                print("L2 queue received stop signal")
+                if verbose:
+                    print("L2 queue received stop signal")
                 l2_out_queue.put(None)  # Signal to L3 that predictions are done
                 break
 
@@ -399,8 +400,12 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
                 )
             else:
                 print("No L2 output queue provided, skipping sending predictions to L3")
-
-            print(f"label={prediction['label']}, confidence={prediction['confidence']}")
+            payload = {
+                "label": prediction["label"],
+                "confidence": prediction["confidence"],
+                "timestamp": timestamp,
+            }
+            print(f"Classifier output: {payload}")
     if verbose:
         print(f"Saved queue predictions to {output_file}")
 

@@ -33,8 +33,8 @@ class EmotionSimulator:
         self.load_yml_config()
         self.load_pow_data()
         self.add_emot_states()
-        self.get_emotion_pow()
-        print("Emotion Simulator initialized.")
+        self.get_emotion_pow(verbose=self.verbose)
+        print("Running L1 as Emotion Simulator")
 
     def load_yml_config(self):
         """Parse config file and return the Python object it represents."""
@@ -48,12 +48,14 @@ class EmotionSimulator:
                 "emotion_range",
                 "transition_duration",
                 "emotiv_pow_frec",
+                "verbose",
             ]
         )
 
         self.file_path = config["feather_file_path"]
         self.emotiv_columns = config["POW_COLUMNS"]
         self.data_frec = config["emotiv_pow_frec"]
+        self.verbose = config["verbose"]
 
         emot_states = config["emotional_states_areas"]
         for state in emot_states:
@@ -110,7 +112,7 @@ class EmotionSimulator:
             self.emot_states.append(state)
             # print(self.data[condition].shape[0], "rows assigned to state", state)
 
-    def get_emotion_pow(self):
+    def get_emotion_pow(self, verbose=False):
         "Organizes the power data by emotional state and initializes the read counters."
         for emot in self.emot_states:
             emot_state_mask = self.data["state"] == emot
@@ -124,7 +126,8 @@ class EmotionSimulator:
             data = data[cols_to_keep]
             self.pow_by_state[emot] = data
             self.pow_read[emot] = 0
-            print(f"State '{emot}': {data.shape[0]} rows loaded.")
+            if verbose:
+                print(f"State '{emot}': {data.shape[0]} rows loaded.")
 
     def zero_pow_read(self):
         """Resets the read count for each emotion state."""

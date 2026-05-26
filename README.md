@@ -53,6 +53,11 @@ APP_CLIENT_SECRET = "your_client_secret"
 ```bash
 python main.py
 ```
+You can overwrite any setting from `config.yml` by passing it as a command line flag using the standard `--key value` syntax. For example:
+```bash
+python main.py --verbose True --classifier_mode train
+```
+Not recommended for bigger changes, but useful for quick overrides.
 
 ## Key `config.yml` settings (summary)
 - `pow_data_source`: `"virtual"` or `"emotiv"`.

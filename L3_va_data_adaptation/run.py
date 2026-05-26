@@ -32,8 +32,10 @@ def run_l3(l2_out_queue: queue.Queue):
     host = sock_cfg["host"]
     port = sock_cfg["port"]
     protocol = sock_cfg["protocol"].lower()
-
-    print(f"L3 starting with {method} smoothing. Socket on {host}:{port} ({protocol})")
+    if verbose:
+        print(
+            f"L3 starting with {method} smoothing. Socket on {host}:{port} ({protocol})"
+        )
 
     output_dir = Path(__file__).parent / "output_data"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -46,7 +48,7 @@ def run_l3(l2_out_queue: queue.Queue):
         server_socket.bind((host, port))
         server_socket.listen(1)
         conn, addr = server_socket.accept()
-        print(f"Connected by {addr}")
+        print(f"Socket listener connected {addr}")
 
         # Optionally, flush the queue of any backlog that built up while waiting
         while not l2_out_queue.empty():
