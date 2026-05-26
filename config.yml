@@ -8,7 +8,7 @@ verbose: False
 # 1 socket listener is requied for the current L3 implementation
 start_socket_listener: True
 # Save output files from each layer
-save_output_files: True
+save_output_files: False
 
 # Layer 1: Data Source Configuration
 
@@ -22,7 +22,7 @@ L1_output_folder: "L1_band_power_capture/output_data"
 
 ## Emotiv headset configuration
 # Emotiv streams, specify which streams to capture from the Emotiv dataset.
-# It should at least include 'pow', for the band power features, but you can include others as needed for your application.e
+# It should at least include 'pow', for the band power features, but you can include others as needed for your application.
 emotiv_streams: ["mot", "dev", "eq", "pow", "met", "com", "fac", "sys"]
 
 # Profile name
@@ -46,6 +46,11 @@ transition_duration: 0
 # name_nequence:
 #  - [emotion_state, duration_in_seconds]
 sequences:
+  test_sequence:
+    - ["neutral", 0.1]
+    - ["happy", 0.1]
+    - ["frustrated", 0.1]
+    - ["angry", 0.1]
   basic:
     - ["frustrated", 1]
     - ["happy", 1]
@@ -231,7 +236,7 @@ classifier_hyperparameters:
   knn:
     n_neighbors: 5
     weights: "distance"
-    n_jobs: 6
+    n_jobs: -1
 
 # Number of classes to predict. Same numer for both for valence and arousal.
 # Only tested for 1, 3 and 5 classes of each
