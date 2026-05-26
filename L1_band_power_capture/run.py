@@ -57,6 +57,7 @@ def run_l1(l1_out_queue: queue.Queue):
             "emotiv_streams",
             "profile_name",
             "verbose",
+            "save_output_files",
         ]
     )
 
@@ -64,11 +65,12 @@ def run_l1(l1_out_queue: queue.Queue):
         simulator = EmotionSimulator(l1_out_queue)
         simulator.main_loop()
 
-        output_path = _build_l1_output_path(
-            config["L1_output_folder"],
-            config["pow_data_source"],
-        )
-        simulator.output_df.to_csv(f"{output_path}/pow.csv")
+        if config["save_output_files"]:
+            output_path = _build_l1_output_path(
+                config["L1_output_folder"],
+                config["pow_data_source"],
+            )
+            simulator.output_df.to_csv(f"{output_path}/pow.csv")
         return
 
     # Emotiv data source logic
@@ -106,6 +108,7 @@ def run_l1(l1_out_queue: queue.Queue):
 
     print(f"Tiempo de Aplicacion: {int(((t1 - t0) / 60) * 100) / 100} min")
 
-    output_path = _build_l1_output_path(config["L1_output_folder"], profile_name)
-    for stream in emotiv.data:
-        emotiv.data[stream].to_csv(f"{output_path}/{stream}.csv")
+    if config["save_output_files"]:
+        output_path = _build_l1_output_path(config["L1_output_folder"], profile_name)
+        for stream in emotiv.data:
+            emotiv.data[stream].to_csv(f"{output_path}/{stream}.csv")

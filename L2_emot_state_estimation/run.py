@@ -99,10 +99,12 @@ def _build_output_file(
     output_csv_folder: str | Path,
     pow_data_source: str,
     filename: str = "predictions.csv",
+    create_dir: bool = True,
 ) -> Path:
     run_stamp = str(int(time.time()))
     output_folder = Path(output_csv_folder) / f"{pow_data_source}_{run_stamp}"
-    output_folder.mkdir(parents=True, exist_ok=True)
+    if create_dir:
+        output_folder.mkdir(parents=True, exist_ok=True)
     return output_folder / filename
 
 
@@ -239,6 +241,7 @@ def predict_from_file(l2_out_queue: queue.Queue):
             "num_classes",
             "models_names",
             "predict_from_file_pow_csv_path",
+            "save_output_files",
         ]
     )
 
@@ -283,24 +286,29 @@ def predict_from_file(l2_out_queue: queue.Queue):
         output_frame["pred_valence"] = eval_data["pred_valence"]
         output_frame["pred_arousal"] = eval_data["pred_arousal"]
 
-    output_file = _build_output_file(
-        config["l2_output_folder"],
-        config["pow_data_source"],
-    )
-    output_frame.to_csv(output_file, index=False)
-    report_file = output_file.with_name("evaluation.txt")
-    report_file.write_text(
-        "\n".join(
-            [
-                f"Joint accuracy: {accuracy_score(true_labels, predicted_labels):.4f}",
-                classification_report(true_labels, predicted_labels, zero_division=0),
-            ]
-        ),
-        encoding="utf-8",
-    )
+    if config["save_output_files"]:
+        output_file = _build_output_file(
+            config["l2_output_folder"],
+            config["pow_data_source"],
+            filename="file_predictions.csv",
+            create_dir=True,
+        )
+        output_frame.to_csv(output_file, index=False)
+        report_file = output_file.with_name("evaluation.txt")
+        report_file.write_text(
+            "\n".join(
+                [
+                    f"Joint accuracy: {accuracy_score(true_labels, predicted_labels):.4f}",
+                    classification_report(
+                        true_labels, predicted_labels, zero_division=0
+                    ),
+                ]
+            ),
+            encoding="utf-8",
+        )
 
-    print(f"Saved predictions to {output_file}")
-    print(f"Saved evaluation report to {report_file}")
+        print(f"Saved predictions to {output_file}")
+        print(f"Saved evaluation report to {report_file}")
 
     if l2_out_queue is not None:
         for prediction in predictions:
@@ -327,11 +335,13 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
             "l2_output_folder",
             "pow_data_source",
             "verbose",
+            "save_output_files",
         ]
     )
     verbose = config["verbose"]
     classifier = config["classifier"]
     pow_columns = config["POW_COLUMNS"]
+    save_files = config["save_output_files"]
 
     print("Running L2 in predict_from_queue mode")
 
@@ -346,10 +356,16 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
         config["l2_output_folder"],
         config["pow_data_source"],
         filename="queue_predictions.csv",
+        create_dir=save_files,
     )
 
-    with output_file.open("w", newline="", encoding="utf-8") as f:
+    f = None
+    writer = None
+    if save_files:
+        f = output_file.open("w", newline="", encoding="utf-8")
         writer = csv.writer(f)
+
+    try:
         first_loop = True
 
         while True:
@@ -365,14 +381,15 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
             pow_vector = feat_select.process_data(pow_values)
 
             if first_loop:
-                features = feat_select.get_final_feature_names()
-                headers = [
-                    *features,
-                    "y_pred",
-                    "confidence",
-                    "timestamp",
-                ]
-                writer.writerow(headers)
+                if save_files:
+                    features = feat_select.get_final_feature_names()
+                    headers = [
+                        *features,
+                        "y_pred",
+                        "confidence",
+                        "timestamp",
+                    ]
+                    writer.writerow(headers)
                 classifier_manager = ClassifierManager(len(pow_vector))
                 classifier_manager.load(model_path, num_classes=config["num_classes"])
                 first_loop = False
@@ -380,15 +397,16 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
             prediction = classifier_manager.predict_with_confidence(pow_vector)
             timestamp = time.time()
 
-            writer.writerow(
-                [
-                    *pow_vector,
-                    prediction["label"],
-                    prediction["confidence"],
-                    timestamp,
-                ]
-            )
-            f.flush()
+            if save_files:
+                writer.writerow(
+                    [
+                        *pow_vector,
+                        prediction["label"],
+                        prediction["confidence"],
+                        timestamp,
+                    ]
+                )
+                f.flush()
 
             if l2_out_queue is not None:
                 l2_out_queue.put(
@@ -406,8 +424,11 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
                 "timestamp": timestamp,
             }
             print(f"Classifier output: {payload}")
-    if verbose:
-        print(f"Saved queue predictions to {output_file}")
+    finally:
+        if f is not None:
+            f.close()
+        if verbose and save_files:
+            print(f"Saved queue predictions to {output_file}")
 
 
 def run_l2(l1_queue: queue.Queue = None, l2_out_queue: queue.Queue = None):
