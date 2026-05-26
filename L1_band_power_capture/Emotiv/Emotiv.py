@@ -1,4 +1,3 @@
-import time
 from . import cortex
 from L1_band_power_capture.Emotiv.cortex import Cortex
 import pandas as pd
@@ -41,7 +40,7 @@ class Subcribe:
         verbose=True,
         **kwargs,
     ):
-        self.c = Cortex(app_client_id, app_client_secret, debug_mode=False, **kwargs)
+        self.c = Cortex(app_client_id, app_client_secret, debug_mode=verbose, **kwargs)
         self.c.bind(create_session_done=self.on_create_session_done)
         self.c.bind(new_data_labels=self.on_new_data_labels)
         self.c.bind(query_profile_done=self.on_query_profile_done)
