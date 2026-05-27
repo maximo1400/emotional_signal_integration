@@ -1,3 +1,4 @@
+import os
 import threading
 import queue
 from L1_band_power_capture.run import run_l1
@@ -5,8 +6,7 @@ from L2_emot_state_estimation.run import run_l2
 from L3_va_data_adaptation.run import run_l3
 from output_listener import run_l3_listener
 from config_loader import get_config
-import os
-from Dreamer.DB_adaptation.run_adaptation import main as run_data_adaptation
+from Dreamer.DB_adaptation.run_adaptation import run_data_adaptation
 
 
 def main() -> None:

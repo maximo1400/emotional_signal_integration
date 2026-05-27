@@ -1,13 +1,11 @@
 import sys
 from pathlib import Path
-import time
 from typing import Dict, List, Sequence, Tuple, Union
+import numpy as np
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from config_loader import get_config
-import numpy as np
 
 
 class FeatureSelector:

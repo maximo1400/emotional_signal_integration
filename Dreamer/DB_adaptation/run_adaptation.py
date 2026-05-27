@@ -15,7 +15,7 @@ from Dreamer.DB_adaptation.eeg_to_pow import (
 )  # noqa: E402
 
 
-def main():
+def run_data_adaptation():
     # Retrieve config values
     keys = ["dreamer_mat_path", "feather_file_path"]
     config = get_config(keys)
@@ -43,5 +43,5 @@ def main():
     print(f"Finished writing bandpower data to {bandpower_feather_path}")
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
