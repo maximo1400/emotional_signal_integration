@@ -37,7 +37,7 @@ def main():
     print("\nStep 2: Processing EEG data to bandpower...")
     print(f"Writing to: {bandpower_feather_path}")
 
-    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=False)
+    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=True)
     df_bp_full.to_feather(str(bandpower_feather_path))
 
     print(f"Finished writing bandpower data to {bandpower_feather_path}")

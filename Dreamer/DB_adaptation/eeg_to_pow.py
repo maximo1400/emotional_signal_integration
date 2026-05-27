@@ -78,7 +78,7 @@ def emotiv_bandpower(
     bands : dict
         {name: (f_low, f_high)} frequency bands.
     output_db : bool
-        If True, return 10*log10(power). Otherwise raw power.
+        If True, return log10(power). Otherwise raw power.
 
     Returns
     -------
@@ -138,7 +138,7 @@ def emotiv_bandpower(
         bp[:, :, idx] = power[:, mask, :].sum(axis=1)
 
     if output_db:
-        bp = 10 * np.log10(bp + 1e-20)
+        bp = np.log10(bp + 1e-20)
 
     # Time axis (center of each window)
     t = (np.arange(n_frames) * hop + win_size // 2) / fs
@@ -250,5 +250,5 @@ if __name__ == "__main__":
     # df_bp.to_feather("emotion_data/Dreamer/dreamer_bandpower_trial.feather")
 
     # Option B: full spectrogram (one row per 0.125 s frame)
-    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=False)
+    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=True)
     df_bp_full.to_feather("emotion_data/Dreamer/dreamer_bandpower_frames.feather")
