@@ -41,7 +41,3 @@ def run_data_adaptation():
     df_bp_full.to_feather(str(bandpower_feather_path))
 
     print(f"Finished writing bandpower data to {bandpower_feather_path}")
-
-
-# if __name__ == "__main__":
-#     main()

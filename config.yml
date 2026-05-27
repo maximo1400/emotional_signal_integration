@@ -15,20 +15,20 @@ save_output_files: False
 # Choose the data source for the pipeline. Options:
 # - "emotiv": Use real data from the Emotiv dataset (requires dataset access and preprocessing)
 # - "virtual": Use simulated data based on predefined emotional state sequences
-pow_data_source: "virtual"  # "emotiv" or "virtual"
+pow_data_source: virtual
 
 # Folder path to save the captured data. This is where the output from the L1 layer will be stored.
-L1_output_folder: "L1_band_power_capture/output_data"
+L1_output_folder: L1_band_power_capture/output_data
 
 ## Emotiv headset configuration
 # Emotiv streams, specify which streams to capture from the Emotiv dataset.
 # It should at least include 'pow', for the band power features, but you can include others as needed for your application.
-emotiv_streams: ["mot", "dev", "eq", "pow", "met", "com", "fac", "sys"]
+emotiv_streams: [mot, dev, eq, pow, met, com, fac, sys]
 
 # Profile name
 # Used to name the output folder for the captured data.
 # Also used to identify the profile in the Emotiv servers
-profile_name: "Emotiv"
+profile_name: Emotiv
 
 ## Virtual simulation parameters (only used if pow_data_source is set to "virtual")
 # If using virtual data, specify the subject ID to simulate. Set to -1 to simulate all subjects, 
@@ -47,31 +47,31 @@ transition_duration: 0
 #  - [emotion_state, duration_in_seconds]
 sequences:
   test_sequence:
-    - ["neutral", 0.1]
-    - ["happy", 0.1]
-    - ["frustrated", 0.1]
-    - ["angry", 0.1]
+    - [neutral, 0.1]
+    - [happy, 0.1]
+    - [frustrated, 0.1]
+    - [angry, 0.1]
   basic:
-    - ["frustrated", 1]
-    - ["happy", 1]
-    - ["angry", 1]
-    - ["neutral", 1]
+    - [frustrated, 1]
+    - [happy, 1]
+    - [angry, 1]
+    - [neutral, 1]
   extended:
-    - ["frustrated", 1]
-    - ["happy", 1.5]
-    - ["angry", 0.5]
-    - ["neutral", 1]
+    - [frustrated, 1]
+    - [happy, 1.5]
+    - [angry, 0.5]
+    - [neutral, 1]
   neutral:
-    - ["neutral", 5]
+    - [neutral, 5]
   bored_angry:
-    - ["bored", 2]
-    - ["angry", 2]
+    - [bored, 2]
+    - [angry, 2]
 
 ## Emotional simulator set up
 # Path to the .mat file containing the DREAMER raw data
-dreamer_mat_path: "Dreamer/DREAMER.mat"
+dreamer_mat_path: Dreamer/DREAMER.mat
 # Path to the feather file containing the pow data
-feather_file_path: "Dreamer/pow.feather"
+feather_file_path: Dreamer/pow.feather
 # Define the range of valence and arousal values for the emotional states.
 # Used to normalize the simulated emotional states.
 emotion_range: [-1.0, 1.0]
@@ -159,8 +159,21 @@ emotional_states_areas:
 emotiv_pow_frec: 8
 
 # Define the columns to be used from the Emotiv dataset for power features.
-POW_COLUMNS: [AF3/theta, AF3/alpha, AF3/betaL, AF3/betaH, AF3/gamma, F7/theta, F7/alpha, F7/betaL, F7/betaH, F7/gamma, F3/theta, F3/alpha, F3/betaL, F3/betaH, F3/gamma, FC5/theta, FC5/alpha, FC5/betaL, FC5/betaH, FC5/gamma, T7/theta, T7/alpha, T7/betaL, T7/betaH, T7/gamma, P7/theta, P7/alpha, P7/betaL, P7/betaH, P7/gamma, O1/theta, O1/alpha, O1/betaL, O1/betaH, O1/gamma, O2/theta, O2/alpha, O2/betaL, O2/betaH, O2/gamma, P8/theta, P8/alpha, P8/betaL, P8/betaH, P8/gamma, T8/theta, T8/alpha, T8/betaL, T8/betaH, T8/gamma, FC6/theta, FC6/alpha, FC6/betaL, FC6/betaH, FC6/gamma, F4/theta, F4/alpha, F4/betaL, F4/betaH, F4/gamma, F8/theta, F8/alpha, F8/betaL, F8/betaH, F8/gamma, AF4/theta, AF4/alpha, AF4/betaL, AF4/betaH, AF4/gamma]
-
+POW_COLUMNS: [
+  AF3/theta, AF3/alpha, AF3/betaL, AF3/betaH, AF3/gamma, 
+  F7/theta,  F7/alpha,  F7/betaL,  F7/betaH,  F7/gamma, 
+  F3/theta,  F3/alpha,  F3/betaL,  F3/betaH,  F3/gamma,
+  FC5/theta, FC5/alpha, FC5/betaL, FC5/betaH, FC5/gamma, 
+  T7/theta,  T7/alpha,  T7/betaL,  T7/betaH,  T7/gamma, 
+  P7/theta,  P7/alpha,  P7/betaL,  P7/betaH,  P7/gamma, 
+  O1/theta,  O1/alpha,  O1/betaL,  O1/betaH,  O1/gamma, 
+  O2/theta,  O2/alpha,  O2/betaL,  O2/betaH,  O2/gamma, 
+  P8/theta,  P8/alpha,  P8/betaL,  P8/betaH,  P8/gamma, 
+  T8/theta,  T8/alpha,  T8/betaL,  T8/betaH,  T8/gamma, 
+  FC6/theta, FC6/alpha, FC6/betaL, FC6/betaH, FC6/gamma,
+  F4/theta,  F4/alpha,  F4/betaL,  F4/betaH,  F4/gamma, 
+  F8/theta,  F8/alpha,  F8/betaL,  F8/betaH,  F8/gamma, 
+  AF4/theta, AF4/alpha, AF4/betaL, AF4/betaH, AF4/gamma]
 epoch_sensors:
   frontal_pairs:
     - [F3, F4]
@@ -175,7 +188,7 @@ epoch_sensors:
 
 
 ## Layer 2: Data Processing Configuration
-l2_output_folder: "L2_emot_state_estimation/output_data"  # Folder path to save the processed data from Layer 2
+l2_output_folder: L2_emot_state_estimation/output_data  # Folder path to save the processed data from Layer 2
 
 ## Feature selection configuration for Layer 2
 # If it's needed, you can specify wich pow_column you wish to use for the classifier in layer 2. 
@@ -189,10 +202,10 @@ l2_pow_columns: []  # List of pow columns to use for feature selection in Layer 
 # area: "frontal" or "parietal"
 # type: "difference" (for differences) or "ratio" (for ratios). Both will be in log scale
 # band: "alpha", "betaL", "betaH", "theta", or "gamma"
-asymmetries: 
-  - ["frontal", "difference", "alpha"]  
-  - ["parietal", "difference", "alpha"]
-  - ["frontal", "ratio", "alpha"]
+asymmetries:
+  - [frontal, difference, alpha]
+  - [parietal, difference, alpha]
+  - [frontal, ratio, alpha]
 
 # Implemented: 
 # - Hjorth mobility: Measures the mean frequency of the signal, which can reflect the overall activity level in the brain. Higher mobility may indicate more active brain states, while lower mobility may indicate more relaxed states.
@@ -201,41 +214,42 @@ features_to_add: []  # List of additional features to add (e.g., ["hjorth_mobili
 
 # Classifier
 # Options: "random_forest", "svm", "knn"
-classifier: "random_forest"  # Classifier to use for emotion state estimation in Layer 2
+classifier: random_forest  # Classifier to use for emotion state estimation in Layer 2
 # Mode for the classifier. Options:
 # - "train": Train the classifier using the processed data from DREAMER.
 # - "predict_from_queue": Load a trained model from file and use it to make predictions on incoming data from L1 queue.
 # - "predict_from_file": Load a trained model from file and use it to make predictions on selected data.
-classifier_mode: "predict_from_queue"
+classifier_mode: predict_from_queue
 # If classifier_mode is set to "predict_from_file", specify the 'pow' CSV file from L1 output to use for making predictions. 
 # This should be a path to a specific CSV file containing the power features extracted by L1.
-predict_from_file_pow_csv_path: "L1_band_power_capture/output_data/emotiv/pow.csv"  # Path to the 'pow' CSV file from L1 output for making predictions (used if classifier_mode is "predict_from_file")
+predict_from_file_pow_csv_path: L1_band_power_capture/output_data/emotiv/pow.csv
 
 # Folder path to save the trained models from Layer 2. Each model will be saved with the corresponding name specified in models_names.
-models_folder: "L2_emot_state_estimation/Models"  # Folder path to save trained models from Layer 2
-models_names:  # Names for the saved models, used to identify them in the Models folder. Should match the classifier names.
-  random_forest: "random_forest.joblib"
-  svm: "svm.joblib"
-  knn: "knn.joblib"
-  
+models_folder: L2_emot_state_estimation/Models
+# Names for the saved models, used to identify them in the Models folder. Should match the classifier names.
+models_names: 
+  random_forest: random_forest.joblib
+  svm: svm.joblib
+  knn: knn.joblib
+
 # Hyperparameters for the classifiers
 classifier_hyperparameters:
   random_forest:
     n_estimators: 100
-    class_weight: 'balanced'
+    class_weight: balanced
     max_depth: 10
     random_state: 42
     n_jobs: -1
   svm:
-    kernel: "rbf"
+    kernel: rbf
     C: 1.0
-    gamma: "scale"
-    class_weight: "balanced"
+    gamma: scale
+    class_weight: balanced
     random_state: 42
     probability: True
   knn:
     n_neighbors: 5
-    weights: "distance"
+    weights: distance
     n_jobs: -1
 
 # Number of classes to predict. Same numer for both for valence and arousal.
@@ -248,12 +262,12 @@ num_classes: 3
 # - "none": No class balancing, use the original class distribution from the dataset.
 # - "undersample": Undersample the majority classes by randomly removing samples until all classes have the same number of samples.
 # - "oversample": Oversample the minority classes by randomly duplicating samples until all classes have the same number of samples.
-class_balancing: "undersample"  # Class balancing method to use for training the classifier
+class_balancing: undersample  # Class balancing method to use for training the classifier
 
 # Method to separate training and testing data. Options:
 # - "random": Randomly split the data into training and testing sets.
 # - "subject": Split the data by subject, using some subjects for training and others for testing. This is a more realistic evaluation method for emotion recognition models, as it tests the model's ability to generalize to new subjects.
-data_split_method: "subject"
+data_split_method: subject
 data_split_parameters:
   random:
     test_size: 0.2  # Proportion of the dataset to include in the test split (used if data_split_method is "random")
@@ -263,16 +277,15 @@ data_split_parameters:
 
 
 ## Layer 3: Data Adaptation Configuration
-l3_output_folder: "L3_va_data_adaptation/output_data"  # Folder path to save the processed data from Layer 3
-
+l3_output_folder: L3_va_data_adaptation/output_data
 # Smoothing algorithm options: 
-# - "rolling_buffer" 
-# - "ema" (Exponential Moving Average)
-# - "steps": keeps values in the DREAMER class domain (integer 1..5) and limits
+# - rolling_buffer
+# - ema (Exponential Moving Average)
+# - steps: keeps values in the DREAMER class domain (integer 1..5) and limits
 #   the per-update class jump using max_step_delta (e.g., 1->2 with delta 1,
 #   1->3 with delta 2, but not 1->5 if max_step_delta is 2)
-# - "none" (no smoothing)
-smoothing_method: "steps"
+# - none: no smoothing
+smoothing_method: steps
 
 # Configurations for the smoothing algorithms
 smoothing_parameters:
@@ -282,9 +295,40 @@ smoothing_parameters:
     alpha: 0.2  # Smoothing factor between 0 and 1. Lower means more smoothing.
   steps:
     max_step_delta: 1  # Max class jump per update (1=adjacent, 2=can skip one)
-
 # Socket configuration for outputting the smoothed data
-socket_config:
-  host: "127.0.0.1"
-  port: 65432
-  protocol: "tcp" 
+socket_config: {host: 127.0.0.1, port: 65432, protocol: tcp}
+
+# Mu and sigma values to normalize emotiv pow data to match the distribution of the DREAMER dataset.
+global_mu: [0.8080242276191711, 0.5091710686683655, 0.26532745361328125, 0.5058607459068298,
+  0.8257171511650085, 0.697574257850647, 0.4077189266681671, 0.206877663731575, 0.48820921778678894,
+  0.821542501449585, 0.6547999978065491, 0.4711518883705139, 0.2127334475517273, 0.4058021605014801,
+  0.727323055267334, 0.5748944282531738, 0.3565930724143982, 0.1607234627008438, 0.41757234930992126,
+  0.7791801691055298, 0.9369016289710999, 0.7040036916732788, 0.5365281105041504,
+  0.845230221748352, 1.1894100904464722, 0.21162569522857666, 0.006686727982014418,
+  -0.12152204662561417, 0.1774819791316986, 0.5372259616851807, 0.8737462162971497,
+  0.6871975660324097, 0.44508981704711914, 0.553255021572113, 0.814193844795227, 1.0866752862930298,
+  0.9457559585571289, 0.6924748420715332, 0.7790483236312866, 0.9973006248474121,
+  1.0825798511505127, 0.9278445839881897, 0.7005539536476135, 0.7819560766220093,
+  1.0060076713562012, 1.2204095125198364, 1.0917013883590698, 0.8650401830673218,
+  1.017366647720337, 1.2987556457519531, 1.1668171882629395, 0.9757028222084045, 0.7062657475471497,
+  0.8656026124954224, 1.1328524351119995, 1.0980589389801025, 0.8736544251441956,
+  0.581647515296936, 0.7457695007324219, 0.9797548055648804, 1.5199546813964844, 1.2093523740768433,
+  0.8835494518280029, 0.9705263376235962, 1.2129056453704834, 1.3748691082000732,
+  1.0237623453140259, 0.7054263949394226, 0.8846592903137207, 1.1765567064285278]
+global_sigma: [1.0585967302322388, 0.9152941107749939, 0.7856037020683289, 0.7421660423278809,
+  0.7608680725097656, 0.9979349970817566, 0.8815754055976868, 0.7809652090072632,
+  0.6797741055488586, 0.7139798998832703, 0.7894909977912903, 0.7244939208030701,
+  0.6330478191375732, 0.5387880802154541, 0.6923635005950928, 0.8311310410499573,
+  0.7329881191253662, 0.6527349352836609, 0.6146818995475769, 0.7623553276062012,
+  0.5364994406700134, 0.4924941658973694, 0.44670915603637695, 0.5192978382110596,
+  0.7147954106330872, 0.7677172422409058, 0.6612028479576111, 0.5977288484573364,
+  0.5242305994033813, 0.6078112125396729, 0.5332913994789124, 0.48251011967658997,
+  0.4075283110141754, 0.4093221127986908, 0.5966252684593201, 0.4537372589111328,
+  0.4153088629245758, 0.3792564570903778, 0.3591313660144806, 0.6084977388381958,
+  0.4866451621055603, 0.49446365237236023, 0.44649478793144226, 0.3625316619873047,
+  0.600310206413269, 0.3781985640525818, 0.37316569685935974, 0.32104018330574036,
+  0.3509354293346405, 0.590075671672821, 0.4832887053489685, 0.39460843801498413,
+  0.3514663577079773, 0.3454965651035309, 0.5816643238067627, 0.7742791175842285,
+  0.72075355052948, 0.6388144493103027, 0.5824854969978333, 0.6763397455215454, 0.4244113266468048,
+  0.35181087255477905, 0.3032194674015045, 0.2906424105167389, 0.5573159456253052,
+  0.783523440361023, 0.6348834037780762, 0.5732128024101257, 0.5693964958190918, 0.6819022297859192]

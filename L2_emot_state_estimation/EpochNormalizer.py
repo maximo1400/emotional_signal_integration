@@ -1,46 +1,52 @@
 import numpy as np
-
+from config_loader import get_config
 
 class EPOCCrossSessionNormalizer:
-    def __init__(self):
-        # Learned from DREAMER
-        self.global_mu = None
-        self.global_sigma = None
+    def __init__(self, is_epoch_data: bool = True, calibration_time: int = 45):
+        self.is_epoch_data = is_epoch_data
+        
+        # Load global statistics from config
+        config = get_config(["global_mu", "global_sigma", "emotiv_pow_frec"])
+        self.global_mu = np.array(config["global_mu"])
+        self.global_sigma = np.array(config["global_sigma"])
+        freq = config["emotiv_pow_frec"]
 
-        # Per-session offset (critical for EPOC)
         self.session_baseline = None
+        self.calibration_buffer = []
+        self.calibration_done = False
+        
+        self.calibration_samples_required = calibration_time * freq
 
-    def fit_dreamer(self, dreamer_features):
-        """
-        DREAMER has multiple subjects, multiple sessions.
-        Compute statistics that generalize across sessions.
-        """
-        # Option 1: Subject-independent (more generalizable)
-        self.global_mu = np.mean(dreamer_features, axis=0)
-        self.global_sigma = np.std(dreamer_features, axis=0)
-
-        # Option 2: Subject-dependent with pooling (if you have subject IDs)
-        # self.subject_stats = {sid: (mu, sigma) for sid in dreamer_subjects}
-
-        return self
-
-    def calibrate_session(self, epoch_baseline_features):
+    def calibrate_session(self, pow_row):
         """
         30-60 seconds of neutral/eyes-open at session start.
-        EPOC sessions vary due to:
-        - Electrode repositioning
-        - Impedance differences
-        - Skin moisture/saline concentration
+
         """
-        self.session_baseline = np.median(epoch_baseline_features, axis=0)
-        return self
+        if not self.is_epoch_data or self.calibration_done:
+            return 
+            
+        self.calibration_buffer.append(pow_row)
+        
+        if len(self.calibration_buffer) >= self.calibration_samples_required:
+            self.session_baseline = np.median(self.calibration_buffer, axis=0)
+            self.calibration_done = True
+            print("Session calibration complete. Baseline computed.")
+            
+        return
 
-    def transform(self, features, source="dreamer"):
+    def transform(self, pow_row, eps = 1e-10):
+        if not self.is_epoch_data:
+            return pow_row
+
         # Z-score with global parameters
-        z = (features - self.global_mu) / (self.global_sigma + 1e-8)
+        z = (pow_row - self.global_mu) / (self.global_sigma + eps)
 
-        if source == "epoch" and self.session_baseline is not None:
+        if self.session_baseline is not None:
             # Remove session-specific offset (common mode)
-            z -= (self.session_baseline - self.global_mu) / self.global_sigma
+            z -= (self.session_baseline - self.global_mu) / (self.global_sigma + eps)
 
         return z
+
+    def new_row(self, pow_row):
+        self.calibrate_session(pow_row)
+        return self.transform(pow_row)
