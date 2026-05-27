@@ -61,12 +61,11 @@ def _va_to_label(val: list[int], ar: list[int]) -> list[str]:
 def _process_pow_vectors(
     df: pd.DataFrame,
     pow_columns: list[str],
-    is_epoch_data: bool,
+    normalizer: EPOCCrossSessionNormalizer,
 ) -> list[list[float]]:
     feat_select = FeatureSelector()
     df_pow = df.reindex(columns=pow_columns)
 
-    normalizer = EPOCCrossSessionNormalizer(is_epoch_data=is_epoch_data)
     return [
         feat_select.process_data(normalizer.new_row(list(row)))
         for row in df_pow.itertuples(index=False, name=None)
