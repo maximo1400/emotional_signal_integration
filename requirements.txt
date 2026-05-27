@@ -6,7 +6,6 @@ seaborn
 scipy
 notebook
 ipykernel
-# torcheeg
 pyyaml
 websocket-client
 python-dispatch

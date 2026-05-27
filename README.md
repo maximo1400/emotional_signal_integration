@@ -28,9 +28,11 @@ This repository provides a layered pipeline for extracting EEG band-power featur
 
 ## How to run
 
-1) Install dependencies:
+1) Install dependencies using `uv` (recommended) or `pip` as a fallback:
 ```bash
-pip install -r requirements.txt
+uv sync
+# Or fallback:
+# pip install -r requirements.txt
 ```
 2) Configure `config.yml` as needed (e.g., choose `pow_data_source`, set sequences, etc.).
 
@@ -48,13 +50,17 @@ APP_CLIENT_SECRET = "your_client_secret"
 ```
 
 
-5) Orchestrate via `main.py`:
+5) Orchestrate via `main.py` using `uv` (recommended) or normal python as a fallback:
 ```bash
-python main.py
+uv run python main.py
+# Or
+# python main.py
 ```
 You can overwrite any setting from `config.yml` by passing it as a command line flag using the standard `--key value` syntax. For example:
 ```bash
-python main.py --verbose True --classifier_mode train
+uv run python main.py --verbose True --classifier_mode train
+# Or
+# python main.py --verbose True --classifier_mode train
 ```
 Not recommended for bigger changes, but useful for quick overrides.
 
