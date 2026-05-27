@@ -20,7 +20,3 @@ dependencies = [
     "websocket-client>=1.9.0",
 ]
 
-[tool.uv.workspace]
-members = [
-    "Dreamer/DB_adaptation/torcheeg_legacy",
-]

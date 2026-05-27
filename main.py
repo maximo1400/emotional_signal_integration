@@ -29,9 +29,10 @@ def main() -> None:
     if not os.path.exists(pow_file_path) and (
         classif_mode == "train" or pow_source == "virtual"
     ):
-        print(f"Data file not found at {pow_file_path}. Running data adaptation...")
+        print(
+            f"Band power file not found at {pow_file_path}. Running data adaptation..."
+        )
         run_data_adaptation()
-
     if classif_mode == "train":
         run_l2(l1_out, l2_out)
 

@@ -40,11 +40,6 @@ pip install -r requirements.txt
   ```bash
   uv run python Dreamer/DB_adaptation/run_adaptation.py
   ```
-- Alternatively, you can use the legacy script with `torcheeg` by running:
-  ```bash
-  cd Dreamer/DB_adaptation/torcheeg_legacy
-  uv run python run_torcheeg_adaptation.py
-  ```
 
 4) If using the Emotiv device, ensure you have the necessary hardware set up and  add yor app credentials in `.env` file, it should look like:
 ```.env
