@@ -69,9 +69,9 @@ sequences:
 
 ## Emotional simulator set up
 # Path to the .mat file containing the DREAMER raw data
-dreamer_mat_path: "L1_band_power_capture/Simulated_pow/Data/Dreamer/DREAMER.mat"
+dreamer_mat_path: "Dreamer/Data/DREAMER.mat"
 # Path to the feather file containing the pow data
-feather_file_path: "L1_band_power_capture/Simulated_pow/Data/Dreamer/pow.feather"  
+feather_file_path: "Dreamer/Data/pow.feather"
 # Define the range of valence and arousal values for the emotional states.
 # Used to normalize the simulated emotional states.
 emotion_range: [-1.0, 1.0]

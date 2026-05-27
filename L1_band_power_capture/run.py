@@ -16,7 +16,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from L1_band_power_capture.Emotiv.Emotiv import Subcribe
-from L1_band_power_capture.Simulated_pow.EmotionSimulator import EmotionSimulator
+from L1_band_power_capture.EmotionSimulator import EmotionSimulator
 
 # Add parent directory to path to import config_loader
 import sys

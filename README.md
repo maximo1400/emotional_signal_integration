@@ -34,7 +34,7 @@ pip install -r requirements.txt
 ```
 2) Configure `config.yml` as needed (e.g., choose `pow_data_source`, set sequences, etc.).
 
-3) If using the virtual simulator, ensure you have the necessary data files in `L1_band_power_capture/Simulated_pow/Data/Dreamer`. 
+3) If using the virtual simulator, or need to train a classifier, ensure you have the necessary data files in `Dreamer/Data`. 
 - Get access to the [Dreamer](https://zenodo.org/records/546113) 
  dataset and place the relevant `.mat` files in that directory.
 - Convert the raw `.mat` data into the band-power `.feather` file expected by the simulator by running the DB adaptation script from the project root:

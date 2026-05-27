@@ -2,15 +2,15 @@ import sys
 from pathlib import Path
 
 # Add root directory to sys.path to resolve imports regardless of where script is executed
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from config_loader import get_config  # noqa: E402
 
-from L1_band_power_capture.Simulated_pow.DB_adaptation.dreamer_to_feather import (
+from Dreamer.DB_adaptation.dreamer_to_feather import (
     convert_mat_to_df,
 )  # noqa: E402
 
-from L1_band_power_capture.Simulated_pow.DB_adaptation.eeg_to_pow import (
+from Dreamer.DB_adaptation.eeg_to_pow import (
     dreamer_to_bandpower,
 )  # noqa: E402
 
@@ -20,8 +20,8 @@ def main():
     keys = ["dreamer_mat_path", "feather_file_path"]
     config = get_config(keys)
 
-    # Resolve the project root assuming this script is in L1_band_power_capture/Simulated_pow/DB_adaptation
-    root_dir = Path(__file__).resolve().parent.parent.parent.parent
+    # Resolve the project root assuming this script is in Dreamer/DB_adaptation
+    root_dir = Path(__file__).resolve().parent.parent.parent
 
     mat_path = root_dir / config["dreamer_mat_path"]
     bandpower_feather_path = root_dir / config["feather_file_path"]
