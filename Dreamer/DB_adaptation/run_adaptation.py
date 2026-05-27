@@ -32,15 +32,12 @@ def main():
     print("Step 1: Reading MAT file and converting to DataFrame...")
     print(f"Reading from: {mat_path}")
 
-    # Use a fixed absolute path for the torcheeg cache to prevent creating random new folders
-    io_cache_path = root_dir / ".torcheeg" / "datasets_cache"
-    df_raw = convert_mat_to_df(str(mat_path), str(io_cache_path))
+    df_raw = convert_mat_to_df(str(mat_path))
 
     print("\nStep 2: Processing EEG data to bandpower...")
     print(f"Writing to: {bandpower_feather_path}")
 
-    # Option B: full spectrogram (one row per 0.125 s frame)
-    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=True)
+    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=False)
     df_bp_full.to_feather(str(bandpower_feather_path))
 
     print(f"Finished writing bandpower data to {bandpower_feather_path}")

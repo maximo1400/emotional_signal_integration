@@ -250,5 +250,5 @@ if __name__ == "__main__":
     # df_bp.to_feather("emotion_data/Dreamer/dreamer_bandpower_trial.feather")
 
     # Option B: full spectrogram (one row per 0.125 s frame)
-    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=True)
+    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=False)
     df_bp_full.to_feather("emotion_data/Dreamer/dreamer_bandpower_frames.feather")
