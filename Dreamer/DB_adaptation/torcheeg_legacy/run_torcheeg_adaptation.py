@@ -6,7 +6,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from config_loader import get_config  # noqa: E402
 
-from Dreamer.DB_adaptation.mat_to_df import (
+from dreamer_to_feather import (
     convert_mat_to_df,
 )  # noqa: E402
 

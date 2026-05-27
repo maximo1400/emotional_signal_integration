@@ -16,6 +16,12 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
+[manifest]
+members = [
+    "emotional-signal-integration",
+    "torcheeg-legacy",
+]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.2"
@@ -727,7 +733,6 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "seaborn" },
-    { name = "torcheeg" },
     { name = "websocket-client" },
 ]
 
@@ -745,7 +750,6 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "torcheeg", specifier = ">=1.1.2" },
     { name = "websocket-client", specifier = ">=1.9.0" },
 ]
 
@@ -3427,6 +3431,23 @@ dependencies = [
     { name = "xmltodict" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f4/d5/45047b7501d635076492c9eb619605d9b43ae68ab719c6db71c8e042b10a/torcheeg-1.1.2.tar.gz", hash = "sha256:a6f13e12d7aa38e11247ee9ba70f320ea36571fd92f3fe9ed5bd24e23a5757ff", size = 214452, upload-time = "2024-05-06T14:23:37.404Z" }
+
+[[package]]
+name = "torcheeg-legacy"
+version = "0.1.0"
+source = { virtual = "Dreamer/DB_adaptation/torcheeg_legacy" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "torcheeg" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "pandas", specifier = ">=3.0.3" },
+    { name = "torcheeg", specifier = ">=1.1.2" },
+]
 
 [[package]]
 name = "torchmetrics"

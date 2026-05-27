@@ -209,9 +209,8 @@ __marimo__/
 
 torcheeg/
 .torcheeg/
-Dreamer/Data/Dreamer/dreamer_bandpower_frames.feather
-Dreamer/Data/Dreamer/pow.feather
-Dreamer/Data/Dreamer/DREAMER.mat
+Dreamer/pow.feather
+Dreamer/DREAMER.mat
 
 L1_band_power_capture/output_data/*
 L2_emot_state_estimation/output_data/*
