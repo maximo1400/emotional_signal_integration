@@ -13,9 +13,9 @@ import time
 from pathlib import Path
 import queue
 import csv
-
 import pandas as pd
 
+from L2_emot_state_estimation.EpochNormalizer import EPOCCrossSessionNormalizer
 from L2_emot_state_estimation.classifier import ClassifierManager
 from L2_emot_state_estimation.featureSelection import FeatureSelector
 from L2_emot_state_estimation.utils import plot_confusion_matrix
@@ -61,12 +61,14 @@ def _va_to_label(val: list[int], ar: list[int]) -> list[str]:
 def _process_pow_vectors(
     df: pd.DataFrame,
     pow_columns: list[str],
+    is_epoch_data: bool,
 ) -> list[list[float]]:
     feat_select = FeatureSelector()
     df_pow = df.reindex(columns=pow_columns)
 
+    normalizer = EPOCCrossSessionNormalizer(is_epoch_data=is_epoch_data)
     return [
-        feat_select.process_data(list(row))
+        feat_select.process_data(normalizer.new_row(list(row)))
         for row in df_pow.itertuples(index=False, name=None)
     ]
 
@@ -256,7 +258,9 @@ def predict_from_file(l2_out_queue: queue.Queue):
     df = pd.read_csv(pow_csv_path)
     df.columns = [str(column).strip() for column in df.columns]
 
-    pow_vectors = _process_pow_vectors(df, config["POW_COLUMNS"])
+    is_epoch_data = "emotiv" in pow_csv_path.name
+    normalizer = EPOCCrossSessionNormalizer(is_epoch_data=is_epoch_data)
+    pow_vectors = _process_pow_vectors(df, config["POW_COLUMNS"], normalizer)
 
     classifier_input_len = len(pow_vectors[0])
     classifier_manager = ClassifierManager(classifier_input_len)
@@ -367,6 +371,8 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
 
     try:
         first_loop = True
+        is_epoch_data = config["pow_data_source"] == "emotiv"
+        normalizer = EPOCCrossSessionNormalizer(is_epoch_data=is_epoch_data)
 
         while True:
             row = pow_queue.get()
@@ -378,7 +384,8 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
                 break
 
             pow_values = _row_to_pow_values(row, pow_columns)
-            pow_vector = feat_select.process_data(pow_values)
+            normalized_values = normalizer.new_row(pow_values)
+            pow_vector = feat_select.process_data(normalized_values)
 
             if first_loop:
                 if save_files:
