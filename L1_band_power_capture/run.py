@@ -41,6 +41,9 @@ def _monitor_stop(emotiv, stop_event: threading.Event, l1_out_queue: queue.Queue
 
 
 def _build_l1_output_path(base_folder: str, suffix: str) -> str:
+    if not os.path.exists(base_folder):
+        os.mkdir(base_folder)
+
     output_path = f"{base_folder}/{suffix}"
     if os.path.exists(output_path):
         output_path = output_path + "_" + str(int(time.time()))
