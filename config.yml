@@ -209,10 +209,15 @@ l2_pow_columns: []  # List of pow columns to use for feature selection in Layer 
 #   band: "theta", "alpha", "betaL", "betaH", "gamma", "beta"
 asymmetries:
   - [frontal, difference, alpha]
-  - [parietal, difference, alpha]
   - [frontal, ratio, alpha]
-  - [frontal, dasm, gamma]
-  - [parietal, rasm, betaL]
+  - [frontal, log_ratio, alpha]
+  - [frontal, dasm, alpha]
+  - [frontal, rasm, alpha]
+  - [parietal, difference, alpha]
+  - [parietal, ratio, alpha]
+  - [parietal, log_ratio, alpha]
+  - [parietal, dasm, alpha]
+  - [parietal, rasm, alpha]
 
 # Available features_to_add options:
 # - Global/Stats: total_power, log_total_power, power_mean, power_std, signal_std
@@ -223,7 +228,14 @@ asymmetries:
 #     mean_<band>, relative_<band>, siq_<band>, de_<band>_mean
 # - Custom: avg_frontal_beta
 # See  L2_emot_state_estimation/features_documentation.md file for more details.
-features_to_add: [total_power,log_total_power, de_gamma_mean, avg_frontal_beta]  # List of additional features to add
+features_to_add: [
+  total_power, log_total_power, power_mean, power_std, signal_std,
+  shannon_entropy, spectral_entropy, mean_sensor_spectral_entropy,
+  hjorth_mobility, hjorth_complexity, median_frequency, diffuse_slowing,
+  engagement_index, beta_alpha_ratio, theta_beta_ratio, theta_alpha_ratio, gamma_beta_ratio, slow_fast_ratio,
+  mean_alpha, relative_alpha, siq_alpha, de_alpha_mean,
+  avg_frontal_beta
+]
 
 # Classifier
 # Options: "random_forest", "svm", "knn"

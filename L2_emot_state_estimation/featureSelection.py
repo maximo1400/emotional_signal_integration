@@ -103,11 +103,18 @@ class FeatureSelector:
 
         pow_arr = np.asarray(pow_data, dtype=float)
         pow_columns_mask_np = np.asarray(self.pow_columns_mask, dtype=bool)
+        feature_pow_arr = self.sanitize_pow_data(pow_arr)
 
-        features = self.add_features(pow_arr)
+        features = self.add_features(feature_pow_arr)
         filtered_pow = pow_arr[pow_columns_mask_np].tolist()
 
         return filtered_pow + features
+
+    def sanitize_pow_data(self, pow_data: np.ndarray) -> np.ndarray:
+        """Clamp raw power values to a finite, nonnegative range for derived features."""
+        pow_arr = np.asarray(pow_data, dtype=float)
+        pow_arr = np.nan_to_num(pow_arr, nan=0.0, posinf=0.0, neginf=0.0)
+        return np.maximum(pow_arr, self.eps)
 
     def get_final_feature_names(self) -> List[str]:
         """Get the names and order of [pow_col, asym, features, timestamp] after selection and addition."""
@@ -121,7 +128,6 @@ class FeatureSelector:
         for feat in self.features_to_add:
             feature_names.append(feat)
 
-        feature_names.append("timestamp")
         return feature_names
 
     def add_features(self, pow_data: np.ndarray) -> List[float]:

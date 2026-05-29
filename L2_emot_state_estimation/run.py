@@ -83,7 +83,8 @@ def _collect_training_data(
     arousal = _set_va_range(df["arousal"].tolist(), num_classes)
     labels = _va_to_label(valence, arousal)
     people = df["subject_id"].tolist()
-    pow_vectors = _process_pow_vectors(df, pow_columns)
+    normalizer = EPOCCrossSessionNormalizer(is_epoch_data=False)
+    pow_vectors = _process_pow_vectors(df, pow_columns, normalizer)
 
     return pow_vectors, labels, people
 
@@ -162,7 +163,7 @@ def train_model():
     classifier = config["classifier"]
     feather_path = config["feather_file_path"]
 
-    print(f"Running L2 in train mode: {feather_path}")
+    print(f"Running L2 in train mode, input: {feather_path}")
 
     pow_vectors, labels, people = _collect_training_data(
         feather_path,
