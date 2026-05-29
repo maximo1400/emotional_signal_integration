@@ -14,8 +14,6 @@ class FeatureSelector:
 
     Input pow_data must be length 70 and ordered according to POW_COLUMNS:
 
-        sensor/theta, sensor/alpha, sensor/betaL, sensor/betaH, sensor/gamma
-
     Features from Garg et al. Chapter 2.3 that can be approximated from
     power-only data:
 
@@ -30,17 +28,6 @@ class FeatureSelector:
     - Median frequency proxy
     - Signal standard deviation proxy
     - Diffuse slowing proxy
-
-    Features that cannot be computed from power-only data:
-
-    - False nearest neighbor
-    - Spikes
-    - Sharp spikes
-    - Delta burst after spike
-    - Number of bursts
-    - Burst length mean/std
-    - Number of suppressions
-    - Suppression length mean/std
     """
 
     def __init__(self):
@@ -101,20 +88,14 @@ class FeatureSelector:
                 f"got {len(pow_data)}."
             )
 
-        pow_arr = np.asarray(pow_data, dtype=float)
         pow_columns_mask_np = np.asarray(self.pow_columns_mask, dtype=bool)
-        feature_pow_arr = self.sanitize_pow_data(pow_arr)
-
-        features = self.add_features(feature_pow_arr)
-        filtered_pow = pow_arr[pow_columns_mask_np].tolist()
-
-        return filtered_pow + features
-
-    def sanitize_pow_data(self, pow_data: np.ndarray) -> np.ndarray:
-        """Clamp raw power values to a finite, nonnegative range for derived features."""
         pow_arr = np.asarray(pow_data, dtype=float)
         pow_arr = np.nan_to_num(pow_arr, nan=0.0, posinf=0.0, neginf=0.0)
-        return np.maximum(pow_arr, self.eps)
+        pow_arr = np.maximum(pow_arr, self.eps)
+
+        features = self.add_features(pow_arr)
+        filtered_pow = pow_arr[pow_columns_mask_np].tolist()
+        return filtered_pow + features
 
     def get_final_feature_names(self) -> List[str]:
         """Get the names and order of [pow_col, asym, features, timestamp] after selection and addition."""
@@ -248,9 +229,10 @@ class FeatureSelector:
         """
         if area == "frontal":
             pairs = self.sensor_info["frontal_pairs"]
-
         elif area == "parietal":
             pairs = self.sensor_info["parietal_pairs"]
+        elif area == "all":
+            pairs = self.sensor_info["all_pairs"]
         else:
             print(f"Unknown area '{area}' for asymmetry calculation. Returning NaN.")
             return np.nan
@@ -362,7 +344,7 @@ class FeatureSelector:
             m0 = sum(P)
             m2 = sum(f^2 * P)
         """
-        band_powers = self.aggregate_power_by_exact_band(pow_data)
+        band_powers = self.aggregate_power_by_band(pow_data)
 
         m0 = 0.0
         m2 = 0.0
@@ -384,7 +366,7 @@ class FeatureSelector:
             m2 = sum(f^2 * P)
             m4 = sum(f^4 * P)
         """
-        band_powers = self.aggregate_power_by_exact_band(pow_data)
+        band_powers = self.aggregate_power_by_band(pow_data)
 
         m0 = 0.0
         m2 = 0.0
@@ -408,7 +390,7 @@ class FeatureSelector:
         Returns the center frequency of the band where cumulative power reaches
         50 percent of total power.
         """
-        band_powers = self.aggregate_power_by_exact_band(pow_data)
+        band_powers = self.aggregate_power_by_band(pow_data)
 
         items = sorted(
             band_powers.items(),
@@ -525,7 +507,7 @@ class FeatureSelector:
         idx = self.sensor_band_idx[(sensor, band)]
         return float(pow_data[idx])
 
-    def aggregate_power_by_exact_band(self, pow_data: np.ndarray) -> Dict[str, float]:
+    def aggregate_power_by_band(self, pow_data: np.ndarray) -> Dict[str, float]:
         """Sum power by exact band (no grouping)."""
         band_powers = {}
         for band in self.sensor_info["frequency_bands"]:

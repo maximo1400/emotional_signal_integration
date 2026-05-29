@@ -174,16 +174,18 @@ POW_COLUMNS: [
   F4/theta,  F4/alpha,  F4/betaL,  F4/betaH,  F4/gamma, 
   F8/theta,  F8/alpha,  F8/betaL,  F8/betaH,  F8/gamma, 
   AF4/theta, AF4/alpha, AF4/betaL, AF4/betaH, AF4/gamma]
+
 epoch_sensors:
+  frontal_electrodes: [F3, F4, AF3, AF4, F7, F8, FC5, FC6]
   frontal_pairs:
     - [F3, F4]
     - [AF3, AF4]
     - [F7, F8]
-  frontal_electrodes: [F3, F4, AF3, AF4, F7, F8, FC5, FC6]
+  parietal_electrodes: [P7, P8]
   parietal_pairs:
     - [P7, P8]
-  parietal_electrodes: [P7, P8]
   electrodes: [AF3, F7, F3, FC5, T7, P7, O1, O2, P8, T8, FC6, F4, F8, AF4]
+  all_pairs: [[F3, F4], [AF3, AF4], [F7, F8], [FC5, FC6], [T7, T8], [P7, P8], [O1, O2]]
   frequency_bands: [alpha, betaL, betaH, theta, gamma]
   band_ranges: 
     theta: [4, 8]
@@ -204,7 +206,7 @@ l2_pow_columns: []  # List of pow columns to use for feature selection in Layer 
 # Asymmetries capture relative differences in brain activity.
 # Extra information on how to calculate them can be found in the L2_emot_state_estimation/features_documentation.md file.
 # Format: [area, type, band]
-#   area: "frontal", "parietal"
+#   area: "frontal", "parietal", "all"
 #   type: "difference", "ratio", "log_ratio", "dasm" (diff entropy), "rasm" (ratio entropy)
 #   band: "theta", "alpha", "betaL", "betaH", "gamma", "beta"
 asymmetries:
@@ -218,6 +220,11 @@ asymmetries:
   - [parietal, log_ratio, alpha]
   - [parietal, dasm, alpha]
   - [parietal, rasm, alpha]
+  - [all, difference, alpha]
+  - [all, ratio, alpha]
+  - [all, log_ratio, alpha]
+  - [all, dasm, alpha]
+  - [all, rasm, alpha]
 
 # Available features_to_add options:
 # - Global/Stats: total_power, log_total_power, power_mean, power_std, signal_std
