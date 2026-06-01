@@ -32,16 +32,7 @@ Hjorth parameters are traditionally time-domain descriptors of an EEG trace. Her
 * **`median_frequency`**: The frequency below which 50% of the total signal power is contained, approximated using the center frequencies of the Emotiv bands.
 * **`diffuse_slowing`**: A proxy for general brain slowing, calculated as `theta / (alpha + beta)`. High diffuse slowing can indicate fatigue, drowsiness, or certain pathological states.
 
-### 5. Band Ratios and Engagement
-Ratios between different frequency bands are some of the most established features in BCI for measuring cognitive and emotional states.
-* **`engagement_index`**: Calculated as `beta / (alpha + theta)`. Widely used to measure alertness, attention, and cognitive workload.
-* **`beta_alpha_ratio`**: `beta / alpha`. A classic measure of arousal and cortical activation.
-* **`theta_beta_ratio`**: `theta / beta`. Often used in attention deficit studies; inversely related to arousal.
-* **`theta_alpha_ratio`**: `theta / alpha`. Can reflect drowsiness or relaxation.
-* **`gamma_beta_ratio`**: `gamma / beta`.
-* **`slow_fast_ratio`**: The ratio of slow waves (`theta`) to fast waves (`alpha`, `betaL`, `betaH`, `gamma`).
-
-### 6. Hemispheric Asymmetries
+### 5. Hemispheric Asymmetries
 Calculated between pairs of electrodes on the left and right hemispheres (e.g., F3/F4, AF3/AF4). The `FeatureSelector` supports multiple methods for calculating this difference:
 * **`difference`**: `mean(Left - Right)`
 * **`ratio`**: `mean(Left / Right)`
@@ -69,8 +60,7 @@ Valence is most strongly correlated with **frontal EEG asymmetry**. The left hem
 ### Predicting Arousal (Excitement vs. Calmness)
 Arousal is linked to general cortical activation, alertness, and cognitive load. High arousal states typically exhibit higher power in fast frequency bands (Beta, Gamma) and lower power in slow bands (Theta, Alpha).
 * **How `FeatureSelector` helps**: 
-    1. **Band Ratios**: Features like `beta_alpha_ratio` and the `engagement_index` are classic indicators of arousal. They condense the relationship between activating (beta) and relaxing (alpha/theta) bands into a single, highly correlated metric.
-    2. **Complexity and Entropy**: High arousal often leads to a more complex, less predictable EEG signal. Features like `spectral_entropy`, `hjorth_mobility`, and `hjorth_complexity` capture this desynchronization.
-    3. **Global Activity**: Metrics like `total_power` and `avg_frontal_beta` can provide a baseline for overall brain activity levels during an emotional response.
+    1. **Complexity and Entropy**: High arousal often leads to a more complex, less predictable EEG signal. Features like `spectral_entropy`, `hjorth_mobility`, and `hjorth_complexity` capture this desynchronization.
+    2. **Global Activity**: Metrics like `total_power` and `avg_frontal_beta` can provide a baseline for overall brain activity levels during an emotional response.
 
 **Summary**: By using `FeatureSelector`, the machine learning pipeline is not forced to implicitly learn complex neurophysiological relationships (like "beta divided by alpha") from raw arrays. Instead, it is explicitly provided with these established psychophysiological biomarkers, drastically improving the model's ability to map EEG data to the Valence-Arousal space.

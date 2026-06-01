@@ -230,7 +230,6 @@ asymmetries:
 # - Global/Stats: total_power, log_total_power, power_mean, power_std, signal_std
 # - Entropy: shannon_entropy, spectral_entropy, mean_sensor_spectral_entropy
 # - Hjorth/Freq: hjorth_mobility, hjorth_complexity, median_frequency, diffuse_slowing
-# - Ratios: engagement_index, beta_alpha_ratio, theta_beta_ratio, theta_alpha_ratio, gamma_beta_ratio, slow_fast_ratio
 # - Band specific (<band> = theta, alpha, betaL, betaH, gamma, beta, slow, fast): 
 #     mean_<band>, relative_<band>, siq_<band>, de_<band>_mean
 # - Custom: avg_frontal_beta
@@ -239,7 +238,6 @@ features_to_add: [
   total_power, log_total_power, power_mean, power_std, signal_std,
   shannon_entropy, spectral_entropy, mean_sensor_spectral_entropy,
   hjorth_mobility, hjorth_complexity, median_frequency, diffuse_slowing,
-  engagement_index, beta_alpha_ratio, theta_beta_ratio, theta_alpha_ratio, gamma_beta_ratio, slow_fast_ratio,
   mean_alpha, relative_alpha, siq_alpha, de_alpha_mean,
   avg_frontal_beta
 ]

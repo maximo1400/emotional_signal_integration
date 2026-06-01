@@ -159,25 +159,6 @@ class FeatureSelector:
         if lname == "diffuse_slowing":
             return self.calc_diffuse_slowing_proxy(pow_data)
 
-        if lname == "engagement_index":
-            return self.calc_ratio(pow_data, ["betaL", "betaH"], ["alpha", "theta"])
-
-        if lname == "beta_alpha_ratio":
-            return self.calc_ratio(pow_data, ["betaL", "betaH"], ["alpha"])
-
-        if lname == "theta_beta_ratio":
-            return self.calc_ratio(pow_data, ["theta"], ["betaL", "betaH"])
-
-        if lname == "theta_alpha_ratio":
-            return self.calc_ratio(pow_data, ["theta"], ["alpha"])
-
-        if lname == "gamma_beta_ratio":
-            return self.calc_ratio(pow_data, ["gamma"], ["betaL", "betaH"])
-
-        if lname == "slow_fast_ratio":
-            return self.calc_ratio(
-                pow_data, ["theta"], ["alpha", "betaL", "betaH", "gamma"]
-            )
 
         if lname == "avg_frontal_beta":
             return self.calc_avg_frontal_beta(pow_data)
@@ -441,21 +422,6 @@ class FeatureSelector:
         total_power = self.calc_total_power(pow_data)
         return float(band_power / (total_power + self.eps))
 
-    def calc_ratio(
-        self,
-        pow_data: np.ndarray,
-        numerator_band: List[str],
-        denominator_band: List[str],
-    ) -> float:
-        numerator = 0.0
-        for band in numerator_band:
-            numerator += self.calc_sum_band_power(pow_data, band)
-
-        denominator = 0.0
-        for band in denominator_band:
-            denominator += self.calc_sum_band_power(pow_data, band)
-
-        return float(numerator / (denominator + self.eps))
 
     def calc_siq_proxy(self, pow_data: np.ndarray, band: str) -> float:
         """
