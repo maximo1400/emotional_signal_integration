@@ -20,8 +20,6 @@ class FeatureSelector:
     - Band power aggregates
     - Shannon entropy over powers
     - Sub-band information quantity proxy
-    - Hjorth mobility proxy from spectral moments
-    - Hjorth complexity proxy from spectral moments
     - Differential entropy proxy
     - Differential asymmetry proxy
     - Rational asymmetry proxy
@@ -138,27 +136,14 @@ class FeatureSelector:
         if lname == "power_std":
             return float(np.std(pow_data))
 
-        if lname == "signal_std":
-            return self.calc_signal_std_proxy(pow_data)
-
         if lname in ["shannon_entropy", "spectral_entropy"]:
             return self.calc_spectral_entropy(pow_data)
 
         if lname == "mean_sensor_spectral_entropy":
             return self.calc_mean_sensor_spectral_entropy(pow_data)
 
-        if lname == "hjorth_mobility":
-            return self.calc_hjorth_mobility_proxy(pow_data)
-
-        if lname == "hjorth_complexity":
-            return self.calc_hjorth_complexity_proxy(pow_data)
-
-        if lname == "median_frequency":
-            return self.calc_median_frequency_proxy(pow_data)
-
-        if lname == "diffuse_slowing":
-            return self.calc_diffuse_slowing_proxy(pow_data)
-
+        if lname == "spectral_centroid":
+            return self.calc_spectral_centroid_proxy(pow_data)
 
         if lname == "avg_frontal_beta":
             return self.calc_avg_frontal_beta(pow_data)
@@ -171,9 +156,9 @@ class FeatureSelector:
             band = name[len("relative_") :]
             return self.calc_relative_band_power(pow_data, band)
 
-        if lname.startswith("siq_"):
-            band = name[len("siq_") :]
-            return self.calc_siq_proxy(pow_data, band)
+        if lname.startswith("band_entropy_contribution_"):
+            band = name[len("band_entropy_contribution_") :]
+            return self.calc_band_entropy_contribution(pow_data, band)
 
         if lname.startswith("de_") and lname.endswith("_mean"):
             band = name[len("de_") : -len("_mean")]
@@ -184,6 +169,7 @@ class FeatureSelector:
             "from features_to_add."
         )
 
+    # Usefull
     def calc_asymmetry(
         self,
         pow_data: np.ndarray,
@@ -256,6 +242,7 @@ class FeatureSelector:
 
         return float(np.mean(values))
 
+    # Usefull
     def calc_avg_frontal_beta(self, pow_data: np.ndarray) -> float:
         """Average beta power across frontal electrodes."""
         beta_values = []
@@ -271,16 +258,7 @@ class FeatureSelector:
         """Sum of all band powers."""
         return float(np.sum(pow_data))
 
-    def calc_signal_std_proxy(self, pow_data: np.ndarray) -> float:
-        """
-        Approximation.
-
-        If summed band power approximates signal variance:
-
-            std ~= sqrt(total_power)
-        """
-        return float(np.sqrt(self.calc_total_power(pow_data)))
-
+    # not very usefull, but part of calc_mean_sensor_spectral_entropy
     def calc_spectral_entropy(self, pow_data: np.ndarray) -> float:
         """
         Shannon entropy over the full 70-dimensional power vector.
@@ -297,6 +275,7 @@ class FeatureSelector:
 
         return float(entropy / (max_entropy + self.eps))
 
+    # Usefull
     def calc_mean_sensor_spectral_entropy(self, pow_data: np.ndarray) -> float:
         """For each sensor, calculate entropy over its 5 bands, then average."""
         entropies = []
@@ -311,103 +290,21 @@ class FeatureSelector:
 
         return float(np.mean(entropies))
 
-    def calc_hjorth_mobility_proxy(self, pow_data: np.ndarray) -> float:
-        """
-        Frequency-domain Hjorth mobility approximation.
-
-        Original time-domain Hjorth mobility:
-            sqrt(var(dx/dt) / var(x))
-
-        Power-domain approximation:
-            sqrt(m2 / m0)
-
-        where:
-            m0 = sum(P)
-            m2 = sum(f^2 * P)
-        """
+    # keep
+    def calc_spectral_centroid_proxy(self, pow_data: np.ndarray) -> float:
         band_powers = self.aggregate_power_by_band(pow_data)
 
-        m0 = 0.0
-        m2 = 0.0
+        total = sum(band_powers.values())
 
-        for band, power in band_powers.items():
-            center = self.band_frec_centrers[band]
-            m0 += power
-            m2 += center**2 * power
-
-        return float(np.sqrt(m2 / (m0 + self.eps)))
-
-    def calc_hjorth_complexity_proxy(self, pow_data: np.ndarray) -> float:
-        """
-        Frequency-domain Hjorth complexity approximation.
-            complexity ~= sqrt((m4 * m0) / m2^2)
-
-        where:
-            m0 = sum(P)
-            m2 = sum(f^2 * P)
-            m4 = sum(f^4 * P)
-        """
-        band_powers = self.aggregate_power_by_band(pow_data)
-
-        m0 = 0.0
-        m2 = 0.0
-        m4 = 0.0
-
-        for band, power in band_powers.items():
-            center = self.band_frec_centrers[band]
-            m0 += power
-            m2 += center**2 * power
-            m4 += center**4 * power
-
-        if m0 <= self.eps or m2 <= self.eps:
-            return np.nan
-
-        return float(np.sqrt((m4 * m0) / (m2**2 + self.eps)))
-
-    def calc_median_frequency_proxy(self, pow_data: np.ndarray) -> float:
-        """
-        Approximate median frequency from band centers.
-
-        Returns the center frequency of the band where cumulative power reaches
-        50 percent of total power.
-        """
-        band_powers = self.aggregate_power_by_band(pow_data)
-
-        items = sorted(
-            band_powers.items(),
-            key=lambda item: self.band_frec_centrers[item[0]],
+        centroid = (
+            sum(
+                self.band_frec_centrers[band] * power
+                for band, power in band_powers.items()
+            )
+            / total
         )
 
-        total = sum(power for _, power in items)
-
-        cumulative = 0.0
-
-        for band, power in items:
-            cumulative += power
-
-            if cumulative >= total / 2.0:
-                return float(self.band_frec_centrers[band])
-
-        # Return highest band center if something goes wrong
-        return float(self.band_frec_centrers[items[-1][0]])
-
-    # TODO: check if this makes sense
-    def calc_diffuse_slowing_proxy(self, pow_data: np.ndarray) -> float:
-        """
-        Original diffuse slowing often depends on delta/theta activity.
-
-        Emotiv vector has no delta, so this proxy uses:
-
-            theta / (alpha + betaL + betaH)
-        """
-        theta = self.calc_sum_band_power(pow_data, "theta")
-        alpha = self.calc_sum_band_power(pow_data, "alpha")
-        betal = self.calc_sum_band_power(pow_data, "betaL")
-        betah = self.calc_sum_band_power(pow_data, "betaH")
-
-        denominator = alpha + betal + betah
-
-        return float(theta / (denominator + self.eps))
+        return float(centroid)
 
     def calc_mean_band_power(self, pow_data: np.ndarray, band: str) -> float:
         values = self.get_band_values(pow_data, band)
@@ -422,20 +319,20 @@ class FeatureSelector:
         total_power = self.calc_total_power(pow_data)
         return float(band_power / (total_power + self.eps))
 
-
-    def calc_siq_proxy(self, pow_data: np.ndarray, band: str) -> float:
+    # keep
+    def calc_band_entropy_contribution(self, pow_data: np.ndarray, band: str) -> float:
         """
-        Sub-band information quantity proxy.
-
-        Original SIQ is entropy of the filtered time-domain signal. With only
-        band power, a reasonable proxy is the entropy contribution of the
-        relative band power:
+        Entropy contribution of one band's relative power:
 
             -p_band * log(p_band)
+
+        where p_band is the band's relative power among the coarse EEG bands.
         """
-        p_band = self.calc_relative_band_power(pow_data, band)
+        p_band = float(self.calc_relative_band_power(pow_data, band))
+        p_band = min(max(p_band, 0.0), 1.0)
         return float(-p_band * np.log(p_band + self.eps))
 
+    # keep
     def calc_mean_differential_entropy_proxy(
         self,
         pow_data: np.ndarray,
@@ -446,6 +343,7 @@ class FeatureSelector:
         de_values = [self.differential_entropy_proxy(val) for val in values]
         return float(np.mean(de_values))
 
+    # keep
     def differential_entropy_proxy(self, power: float) -> float:
         """
         Gaussian differential entropy approximation.
