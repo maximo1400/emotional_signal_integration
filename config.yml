@@ -227,16 +227,16 @@ asymmetries:
   - [all, rasm, alpha]
 
 # Available features_to_add options:
-# - Global/Stats: total_power, log_total_power, power_mean, power_std
-# - Entropy: shannon_entropy, spectral_entropy, mean_sensor_spectral_entropy
+# - Global/Stats: total_power, power_mean, power_std
+# - Entropy: spectral_entropy, mean_sensor_spectral_entropy
 # - Freq: spectral_centroid
 # - Band specific (<band> = theta, alpha, betaL, betaH, gamma, beta, slow, fast): 
 #     mean_<band>, relative_<band>, band_entropy_contribution_<band>, de_<band>_mean
 # - Custom: avg_frontal_beta
 # See  L2_emot_state_estimation/features_documentation.md file for more details.
 features_to_add: [
-  total_power, log_total_power, power_mean, power_std,
-  shannon_entropy, spectral_entropy, mean_sensor_spectral_entropy,
+  total_power, power_mean, power_std,
+  spectral_entropy, mean_sensor_spectral_entropy,
   spectral_centroid,
   mean_alpha, relative_alpha, band_entropy_contribution_alpha, de_alpha_mean,
   avg_frontal_beta

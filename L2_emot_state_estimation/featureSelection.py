@@ -127,16 +127,13 @@ class FeatureSelector:
         if lname == "total_power":
             return self.calc_total_power(pow_data)
 
-        if lname == "log_total_power":
-            return float(np.log(self.calc_total_power(pow_data) + self.eps))
-
         if lname == "power_mean":
             return float(np.mean(pow_data))
 
         if lname == "power_std":
             return float(np.std(pow_data))
 
-        if lname in ["shannon_entropy", "spectral_entropy"]:
+        if lname == "spectral_entropy":
             return self.calc_spectral_entropy(pow_data)
 
         if lname == "mean_sensor_spectral_entropy":

@@ -13,13 +13,12 @@ The features that can be added via the `features_to_add` and `asymmetries` confi
 ### 1. Global Power and Statistical Features
 These features capture the overall magnitude and variance of the EEG signal across all sensors and bands.
 * **`total_power`**: The sum of all power values across all bands and sensors.
-* **`log_total_power`**: The natural logarithm of the total power, often more normally distributed.
 * **`power_mean`**: The average power across the 70-dimensional vector.
 * **`power_std`**: The standard deviation of the power vector.
 
 ### 2. Entropy Features
 Entropy measures the unpredictability, randomness, or complexity of the signal. Higher entropy usually signifies higher cognitive processing or a more active brain state.
-* **`shannon_entropy` / `spectral_entropy`**: The Shannon entropy calculated over the normalized 70-dimensional power vector, scaled between 0 and 1.
+* **`spectral_entropy`**: The Shannon entropy calculated over the normalized 70-dimensional power vector, scaled between 0 and 1.
 * **`mean_sensor_spectral_entropy`**: Calculates the spectral entropy for *each* sensor individually across its 5 frequency bands, and then averages them. This often provides a more localized measure of complexity than global entropy.
 
 ### 3. Frequency Proxies
