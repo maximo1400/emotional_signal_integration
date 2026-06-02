@@ -232,7 +232,7 @@ def train_model():
     print(f"Saved evaluation report to {report_file}")
 
 
-def predict_from_file(l2_out_queue: queue.Queue):
+def predict_from_file(l1_queue: queue.Queue, l2_queue: queue.Queue):
     config = get_config(
         [
             "models_folder",
@@ -314,21 +314,21 @@ def predict_from_file(l2_out_queue: queue.Queue):
         print(f"Saved predictions to {output_file}")
         print(f"Saved evaluation report to {report_file}")
 
-    if l2_out_queue is not None:
+    if l2_queue is not None:
         for prediction in predictions:
-            l2_out_queue.put(
+            l2_queue.put(
                 {
                     "label": prediction["label"],
                     "confidence": prediction["confidence"],
                     "timestamp": time.time(),
                 }
             )
-        l2_out_queue.put(None)  # Signal to L3 that predictions are done
+        l2_queue.put(None)  # Signal to L3 that predictions are done
     else:
         print("No L2 output queue provided, skipping sending predictions to L3")
 
 
-def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None):
+def predict_from_queue(l1_queue: queue.Queue, l2_queue: queue.Queue):
     config = get_config(
         [
             "models_folder",
@@ -375,12 +375,12 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
         normalizer = EPOCCrossSessionNormalizer(is_epoch_data=is_epoch_data)
 
         while True:
-            row = pow_queue.get()
+            row = l1_queue.get()
 
             if row is None:
                 if verbose:
                     print("L2 queue received stop signal")
-                l2_out_queue.put(None)  # Signal to L3 that predictions are done
+                l2_queue.put(None)  # Signal to L3 that predictions are done
                 break
 
             pow_values = _row_to_pow_values(row, pow_columns)
@@ -415,16 +415,15 @@ def predict_from_queue(pow_queue: queue.Queue, l2_out_queue: queue.Queue = None)
                 )
                 f.flush()
 
-            if l2_out_queue is not None:
-                l2_out_queue.put(
-                    {
-                        "label": prediction["label"],
-                        "confidence": prediction["confidence"],
-                        "timestamp": timestamp,
-                    }
-                )
-            else:
-                print("No L2 output queue provided, skipping sending predictions to L3")
+
+            l2_queue.put(
+                {
+                    "label": prediction["label"],
+                    "confidence": prediction["confidence"],
+                    "timestamp": timestamp,
+                }
+            )
+
             payload = {
                 "label": prediction["label"],
                 "confidence": prediction["confidence"],
@@ -445,6 +444,6 @@ def run_l2(l1_queue: queue.Queue = None, l2_out_queue: queue.Queue = None):
     if mode == "train":
         train_model()
     elif mode == "predict_from_file":
-        predict_from_file(l2_out_queue)
+        predict_from_file(l1_queue, l2_out_queue)
     elif mode == "predict_from_queue":
         predict_from_queue(l1_queue, l2_out_queue)
