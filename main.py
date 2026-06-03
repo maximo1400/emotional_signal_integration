@@ -1,3 +1,4 @@
+import time
 import os
 import threading
 import queue
@@ -13,14 +14,13 @@ def main() -> None:
     l1_out = queue.Queue()
     l2_out = queue.Queue()
 
-    config = get_config(
-        [
-            "classifier_mode",
-            "start_socket_listener",
-            "feather_file_path",
-            "pow_data_source",
-        ]
-    )
+    config = get_config([
+        "classifier_mode",
+        "start_socket_listener",
+        "feather_file_path",
+        "pow_data_source",
+    ])
+    print(f"startimg on timestamp: {time.time()}")
     classif_mode = config["classifier_mode"]
     listen_out = config["start_socket_listener"]
     pow_file_path = config["feather_file_path"]
@@ -49,6 +49,9 @@ def main() -> None:
 
     if classif_mode == "predict_from_queue":
         run_l1(l1_out)
+    elif classif_mode == "predict_from_file":
+        l2_thread.join()
+        l3_thread.join()
 
 
 if __name__ == "__main__":

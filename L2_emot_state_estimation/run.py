@@ -44,6 +44,8 @@ def _set_va_range(values: list[int], num_classes: int) -> list[int]:
     if num_classes == 5:
         return [value - 1 for value in values]
 
+    if num_classes == -2:
+        return [0 if value <= 2 else 1 if value == 3 else 2 for value in values]
     # Map 1..5 to 0..(num_classes-1), keeping midpoint stable for num_classes=3
     return [
         max(
@@ -89,14 +91,6 @@ def _collect_training_data(
     return pow_vectors, labels, people
 
 
-def _build_model_path(
-    models_folder: str | Path,
-    models_names: dict[str, str],
-    classifier: str,
-) -> Path:
-    return Path(models_folder) / models_names[classifier]
-
-
 def _build_output_file(
     output_csv_folder: str | Path,
     pow_data_source: str,
@@ -125,14 +119,19 @@ def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str
 def _evaluate_predictions(
     true_labels: list[str],
     predicted_labels: list[str],
-):
+) -> dict[str, list[str]]:
     true_valence, true_arousal = _split_va_labels(true_labels)
     predicted_valence, predicted_arousal = _split_va_labels(predicted_labels)
 
-    print("Joint accuracy:", accuracy_score(true_labels, predicted_labels))
-    print("Valence accuracy:", accuracy_score(true_valence, predicted_valence))
-    print("Arousal accuracy:", accuracy_score(true_arousal, predicted_arousal))
-    print(classification_report(true_labels, predicted_labels, zero_division=0))
+    valence_acc = accuracy_score(true_valence, predicted_valence)
+    arousal_acc = accuracy_score(true_arousal, predicted_arousal)
+    joint_acc = accuracy_score(true_labels, predicted_labels)
+    class_report = classification_report(true_labels, predicted_labels, zero_division=0)
+
+    print("Valence accuracy:", valence_acc)
+    print("Arousal accuracy:", arousal_acc)
+    print("Joint accuracy:", joint_acc)
+    print("classification_report: ", class_report)
     plot_confusion_matrix(true_labels, predicted_labels)
 
     return {
@@ -140,28 +139,34 @@ def _evaluate_predictions(
         "true_arousal": true_arousal,
         "pred_valence": predicted_valence,
         "pred_arousal": predicted_arousal,
+        "valence_acc": valence_acc,
+        "arousal_acc": arousal_acc,
+        "Joint_accuracy": joint_acc,
+        "classification_report": class_report,
     }
 
 
 def train_model():
-    config = get_config(
-        [
-            "feather_file_path",
-            "POW_COLUMNS",
-            "classifier",
-            "classifier_hyperparameters",
-            "num_classes",
-            "models_folder",
-            "models_names",
-            "l2_output_folder",
-            "class_balancing",
-            "data_split_method",
-            "data_split_parameters",
-        ]
-    )
+    config = get_config([
+        "feather_file_path",
+        "POW_COLUMNS",
+        "classifier",
+        "classifier_hyperparameters",
+        "num_classes",
+        "models_folder",
+        "models_names",
+        "l2_output_folder",
+        "class_balancing",
+        "data_split_method",
+        "data_split_parameters",
+    ])
 
     classifier = config["classifier"]
     feather_path = config["feather_file_path"]
+
+    model_folder = config["models_folder"]
+    model_filename = config["models_names"][classifier]
+    model_path = Path(model_folder) / model_filename
 
     print(f"Running L2 in train mode, input: {feather_path}")
 
@@ -173,12 +178,6 @@ def train_model():
 
     classifier_input_len = len(pow_vectors[0])
     classifier_manager = ClassifierManager(classifier_input_len)
-
-    model_path = _build_model_path(
-        config["models_folder"],
-        config["models_names"],
-        classifier,
-    )
 
     train_result = classifier_manager.train(
         classifier,
@@ -198,16 +197,14 @@ def train_model():
 
     eval_data = _evaluate_predictions(true_labels, predicted_labels)
 
-    output_frame = pd.DataFrame(
-        {
-            "true_label": true_labels,
-            "pred_label": predicted_labels,
-            "true_valence": eval_data["true_valence"],
-            "true_arousal": eval_data["true_arousal"],
-            "pred_valence": eval_data["pred_valence"],
-            "pred_arousal": eval_data["pred_arousal"],
-        }
-    )
+    output_frame = pd.DataFrame({
+        "true_label": true_labels,
+        "pred_label": predicted_labels,
+        "true_valence": eval_data["true_valence"],
+        "true_arousal": eval_data["true_arousal"],
+        "pred_valence": eval_data["pred_valence"],
+        "pred_arousal": eval_data["pred_arousal"],
+    })
 
     output_file = _build_output_file(
         config["l2_output_folder"],
@@ -219,12 +216,10 @@ def train_model():
 
     report_file = output_file.with_name("evaluation.txt")
     report_file.write_text(
-        "\n".join(
-            [
-                f"Joint accuracy: {accuracy_score(true_labels, predicted_labels):.4f}",
-                classification_report(true_labels, predicted_labels, zero_division=0),
-            ]
-        ),
+        "\n".join([
+            f"Joint accuracy: {eval_data['Joint_accuracy']:.4f}",
+            {eval_data["classification_report"]},
+        ]),
         encoding="utf-8",
     )
 
@@ -233,128 +228,66 @@ def train_model():
 
 
 def predict_from_file(l1_queue: queue.Queue, l2_queue: queue.Queue):
-    config = get_config(
-        [
-            "models_folder",
-            "classifier",
-            "pow_data_source",
-            "l2_output_folder",
-            "POW_COLUMNS",
-            "num_classes",
-            "models_names",
-            "predict_from_file_pow_csv_path",
-            "save_output_files",
-        ]
-    )
+    config = get_config([
+        "POW_COLUMNS",
+        "num_classes",
+        "predict_from_file_pow_csv_path",
+    ])
 
-    classifier = config["classifier"]
     pow_csv_path = Path(config["predict_from_file_pow_csv_path"])
 
     if not pow_csv_path.exists():
-        raise FileNotFoundError(f"Missing pow.csv at {pow_csv_path}")
+        print(f"Missing pow.csv at {pow_csv_path}")
 
     print(f"Running L2 in predict_from_file mode: {pow_csv_path}")
-
     df = pd.read_csv(pow_csv_path)
     df.columns = [str(column).strip() for column in df.columns]
 
-    is_epoch_data = "emotiv" in pow_csv_path.name
-    normalizer = EPOCCrossSessionNormalizer(is_epoch_data=is_epoch_data)
-    pow_vectors = _process_pow_vectors(df, config["POW_COLUMNS"], normalizer)
-
-    classifier_input_len = len(pow_vectors[0])
-    classifier_manager = ClassifierManager(classifier_input_len)
-
-    model_path = _build_model_path(
-        config["models_folder"],
-        config["models_names"],
-        classifier,
-    )
-    classifier_manager.load(model_path, num_classes=config["num_classes"])
-
-    predictions = classifier_manager.batch_predict_with_confidence(pow_vectors)
-    output_frame = pd.DataFrame(predictions)
-
+    true_labels = None
     if "valence" in df.columns and "arousal" in df.columns:
-        true_valence = _set_va_range(df["valence"].tolist(), config["num_classes"])
-        true_arousal = _set_va_range(df["arousal"].tolist(), config["num_classes"])
-        true_labels = _va_to_label(true_valence, true_arousal)
+        num_classes = config["num_classes"]
+        true_valences = _set_va_range(df["valence"].tolist(), num_classes)
+        true_arousals = _set_va_range(df["arousal"].tolist(), num_classes)
+        true_labels = _va_to_label(true_valences, true_arousals)
 
-        predicted_labels = [str(prediction["label"]) for prediction in predictions]
+    df_pow = df.reindex(columns=config["POW_COLUMNS"])
+    for row in df_pow.itertuples(index=False, name=None):
+        l1_queue.put(list(row))
+    l1_queue.put(None)
 
-        eval_data = _evaluate_predictions(true_labels, predicted_labels)
-
-        output_frame["true_label"] = true_labels
-        output_frame["true_valence"] = eval_data["true_valence"]
-        output_frame["true_arousal"] = eval_data["true_arousal"]
-        output_frame["pred_valence"] = eval_data["pred_valence"]
-        output_frame["pred_arousal"] = eval_data["pred_arousal"]
-
-    if config["save_output_files"]:
-        output_file = _build_output_file(
-            config["l2_output_folder"],
-            config["pow_data_source"],
-            filename="file_predictions.csv",
-            create_dir=True,
-        )
-        output_frame.to_csv(output_file, index=False)
-        report_file = output_file.with_name("evaluation.txt")
-        report_file.write_text(
-            "\n".join(
-                [
-                    f"Joint accuracy: {accuracy_score(true_labels, predicted_labels):.4f}",
-                    classification_report(
-                        true_labels, predicted_labels, zero_division=0
-                    ),
-                ]
-            ),
-            encoding="utf-8",
-        )
-
-        print(f"Saved predictions to {output_file}")
-        print(f"Saved evaluation report to {report_file}")
-
-    if l2_queue is not None:
-        for prediction in predictions:
-            l2_queue.put(
-                {
-                    "label": prediction["label"],
-                    "confidence": prediction["confidence"],
-                    "timestamp": time.time(),
-                }
-            )
-        l2_queue.put(None)  # Signal to L3 that predictions are done
-    else:
-        print("No L2 output queue provided, skipping sending predictions to L3")
-
-
-def predict_from_queue(l1_queue: queue.Queue, l2_queue: queue.Queue):
-    config = get_config(
-        [
-            "models_folder",
-            "classifier",
-            "POW_COLUMNS",
-            "num_classes",
-            "models_names",
-            "l2_output_folder",
-            "pow_data_source",
-            "verbose",
-            "save_output_files",
-        ]
+    print(
+        "Finished sending pow vectors to L1 queue, now will run L2 in predict_from_queue mode"
     )
+    predict_from_queue(l1_queue, l2_queue, true_labels=true_labels)
+
+
+def predict_from_queue(
+    l1_queue: queue.Queue, l2_queue: queue.Queue, true_labels: list[str] = None
+):
+    config = get_config([
+        "models_folder",
+        "classifier",
+        "POW_COLUMNS",
+        "num_classes",
+        "models_names",
+        "l2_output_folder",
+        "pow_data_source",
+        "verbose",
+        "save_output_files",
+    ])
     verbose = config["verbose"]
     classifier = config["classifier"]
     pow_columns = config["POW_COLUMNS"]
     save_files = config["save_output_files"]
+    num_classes = config["num_classes"]
+
+    model_folder = config["models_folder"]
+    model_filename = config["models_names"][classifier]
+    model_path = Path(model_folder) / model_filename
 
     print("Running L2 in predict_from_queue mode")
 
     feat_select = FeatureSelector()
-    model_path = _build_model_path(
-        config["models_folder"],
-        config["models_names"],
-        classifier,
-    )
 
     output_file = _build_output_file(
         config["l2_output_folder"],
@@ -368,6 +301,8 @@ def predict_from_queue(l1_queue: queue.Queue, l2_queue: queue.Queue):
     if save_files:
         f = output_file.open("w", newline="", encoding="utf-8")
         writer = csv.writer(f)
+
+    predicted_labels = []
 
     try:
         first_loop = True
@@ -396,45 +331,65 @@ def predict_from_queue(l1_queue: queue.Queue, l2_queue: queue.Queue):
                         "confidence",
                         "timestamp",
                     ]
+                    if true_labels is not None:
+                        headers.append("y_true")
                     writer.writerow(headers)
                 classifier_manager = ClassifierManager(len(pow_vector))
-                classifier_manager.load(model_path, num_classes=config["num_classes"])
+                classifier_manager.load(model_path, num_classes=num_classes)
                 first_loop = False
 
             prediction = classifier_manager.predict_with_confidence(pow_vector)
             timestamp = time.time()
 
+            predicted_labels.append(str(prediction["label"]))
+
             if save_files:
-                writer.writerow(
-                    [
-                        *pow_vector,
-                        prediction["label"],
-                        prediction["confidence"],
-                        timestamp,
-                    ]
-                )
+                row = [
+                    *pow_vector,
+                    prediction["label"],
+                    prediction["confidence"],
+                    timestamp,
+                ]
+                if true_labels is not None:
+                    row.append(true_labels[len(predicted_labels) - 1])
+                writer.writerow(row)
                 f.flush()
-
-
-            l2_queue.put(
-                {
-                    "label": prediction["label"],
-                    "confidence": prediction["confidence"],
-                    "timestamp": timestamp,
-                }
-            )
 
             payload = {
                 "label": prediction["label"],
                 "confidence": prediction["confidence"],
                 "timestamp": timestamp,
             }
+            l2_queue.put(payload)
             print(f"Classifier output: {payload}")
     finally:
         if f is not None:
             f.close()
         if verbose and save_files:
             print(f"Saved queue predictions to {output_file}")
+
+        if true_labels is not None and len(true_labels) == len(predicted_labels):
+            print("\nEvaluating Virtual File Predictions:")
+            report = _evaluate_predictions(true_labels, predicted_labels)
+
+            if save_files:
+                report_file = output_file.with_name("evaluation.txt")
+                report_filter = {
+                    "true_valence",
+                    "true_arousal",
+                    "pred_valence",
+                    "pred_arousal",
+                }
+                report_file.write_text(
+                    [
+                        f"{key}: {value}"
+                        for key, value in report.items()
+                        if value not in report_filter
+                    ],
+                    encoding="utf-8",
+                )
+
+                print(f"Saved evaluation report to {report_file}")
 
 
 def run_l2(l1_queue: queue.Queue = None, l2_out_queue: queue.Queue = None):
