@@ -20,15 +20,13 @@ def parse_label(label_str: str) -> tuple[float, float]:
 
 
 def run_l3(l2_out_queue: queue.Queue):
-    config = get_config(
-        [
-            "smoothing_method",
-            "smoothing_parameters",
-            "socket_config",
-            "verbose",
-            "save_output_files",
-        ]
-    )
+    config = get_config([
+        "smoothing_method",
+        "smoothing_parameters",
+        "socket_config",
+        "verbose",
+        "save_output_files",
+    ])
     verbose = config["verbose"]
     method = config["smoothing_method"]
     params = config["smoothing_parameters"][method]
@@ -59,10 +57,6 @@ def run_l3(l2_out_queue: queue.Queue):
         server_socket.listen(1)
         conn, addr = server_socket.accept()
         print(f"Socket listener connected {addr}")
-
-        # Optionally, flush the queue of any backlog that built up while waiting
-        while not l2_out_queue.empty():
-            l2_out_queue.get_nowait()
     else:
         # UDP broadcaster
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -75,16 +69,14 @@ def run_l3(l2_out_queue: queue.Queue):
         if save_files:
             f = output_file.open("w", newline="", encoding="utf-8")
             writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "raw_valence",
-                    "raw_arousal",
-                    "smoothed_valence",
-                    "smoothed_arousal",
-                    "confidence",
-                    "timestamp",
-                ]
-            )
+            writer.writerow([
+                "raw_valence",
+                "raw_arousal",
+                "smoothed_valence",
+                "smoothed_arousal",
+                "confidence",
+                "timestamp",
+            ])
 
         while True:
             data = l2_out_queue.get()
@@ -106,16 +98,14 @@ def run_l3(l2_out_queue: queue.Queue):
             }
 
             if save_files:
-                writer.writerow(
-                    [
-                        payload["raw_valence"],
-                        payload["raw_arousal"],
-                        payload["smoothed_valence"],
-                        payload["smoothed_arousal"],
-                        payload["confidence"],
-                        payload["timestamp"],
-                    ]
-                )
+                writer.writerow([
+                    payload["raw_valence"],
+                    payload["raw_arousal"],
+                    payload["smoothed_valence"],
+                    payload["smoothed_arousal"],
+                    payload["confidence"],
+                    payload["timestamp"],
+                ])
                 f.flush()
 
             message = json.dumps(payload) + "\n"

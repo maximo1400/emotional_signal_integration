@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
@@ -74,4 +77,4 @@ def plot_confusion_matrix(
     if save_png:
         plt.savefig(png_path, dpi=dpi, bbox_inches="tight")
 
-    plt.show()
+    plt.close()

@@ -119,6 +119,8 @@ def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str
 def _evaluate_predictions(
     true_labels: list[str],
     predicted_labels: list[str],
+    output_dir: Path | str,
+    save_png: bool = True,
 ) -> dict[str, list[str]]:
     true_valence, true_arousal = _split_va_labels(true_labels)
     predicted_valence, predicted_arousal = _split_va_labels(predicted_labels)
@@ -131,8 +133,12 @@ def _evaluate_predictions(
     print("Valence accuracy:", valence_acc)
     print("Arousal accuracy:", arousal_acc)
     print("Joint accuracy:", joint_acc)
-    print("classification_report: ", class_report)
-    plot_confusion_matrix(true_labels, predicted_labels)
+    print("classification_report:\n", class_report)
+
+    png_path = Path(output_dir) / "confusion_matrix.png"
+    plot_confusion_matrix(
+        true_labels, predicted_labels, save_png=save_png, png_path=str(png_path)
+    )
 
     return {
         "true_valence": true_valence,
@@ -195,7 +201,15 @@ def train_model():
     true_labels = [str(label) for label in train_result["y_test"]]
     predicted_labels = [str(label) for label in train_result["y_pred"]]
 
-    eval_data = _evaluate_predictions(true_labels, predicted_labels)
+    output_file = _build_output_file(
+        config["l2_output_folder"],
+        "train",
+        filename="test_predictions.csv",
+    )
+
+    eval_data = _evaluate_predictions(
+        true_labels, predicted_labels, output_dir=output_file.parent, save_png=True
+    )
 
     output_frame = pd.DataFrame({
         "true_label": true_labels,
@@ -206,22 +220,17 @@ def train_model():
         "pred_arousal": eval_data["pred_arousal"],
     })
 
-    output_file = _build_output_file(
-        config["l2_output_folder"],
-        "train",
-        filename="test_predictions.csv",
-    )
-
     output_frame.to_csv(output_file, index=False)
 
     report_file = output_file.with_name("evaluation.txt")
-    report_file.write_text(
-        "\n".join([
-            f"Joint accuracy: {eval_data['Joint_accuracy']:.4f}",
-            {eval_data["classification_report"]},
-        ]),
-        encoding="utf-8",
-    )
+    report_filtered = [
+        f"valence_acc: {eval_data['valence_acc']:.4f}",
+        f"arousal_acc: {eval_data['arousal_acc']:.4f}",
+        f"Joint_accuracy: {eval_data['Joint_accuracy']:.4f}",
+        "classification_report:\n",
+        eval_data["classification_report"],
+    ]
+    report_file.write_text("\n".join(report_filtered), encoding="utf-8")
 
     print(f"Saved train/test comparison to {output_file}")
     print(f"Saved evaluation report to {report_file}")
@@ -237,7 +246,7 @@ def predict_from_file(l1_queue: queue.Queue, l2_queue: queue.Queue):
     pow_csv_path = Path(config["predict_from_file_pow_csv_path"])
 
     if not pow_csv_path.exists():
-        print(f"Missing pow.csv at {pow_csv_path}")
+        raise FileNotFoundError(f"Missing pow.csv at {pow_csv_path}")
 
     print(f"Running L2 in predict_from_file mode: {pow_csv_path}")
     df = pd.read_csv(pow_csv_path)
@@ -370,26 +379,27 @@ def predict_from_queue(
 
         if true_labels is not None and len(true_labels) == len(predicted_labels):
             print("\nEvaluating Virtual File Predictions:")
-            report = _evaluate_predictions(true_labels, predicted_labels)
-
             if save_files:
-                report_file = output_file.with_name("evaluation.txt")
-                report_filter = {
-                    "true_valence",
-                    "true_arousal",
-                    "pred_valence",
-                    "pred_arousal",
-                }
-                report_file.write_text(
-                    [
-                        f"{key}: {value}"
-                        for key, value in report.items()
-                        if value not in report_filter
-                    ],
-                    encoding="utf-8",
+                report = _evaluate_predictions(
+                    true_labels,
+                    predicted_labels,
+                    output_dir=output_file.parent,
+                    save_png=save_files,
                 )
+                report_file = output_file.with_name("evaluation.txt")
+                report_fitered = [
+                    f"valence_acc: {report['valence_acc']:.4f}",
+                    f"arousal_acc: {report['arousal_acc']:.4f}",
+                    f"Joint_accuracy: {report['Joint_accuracy']:.4f}",
+                    "classification_report:\n",
+                    report["classification_report"],
+                ]
+                report_file.write_text("\n".join(report_fitered), encoding="utf-8")
 
                 print(f"Saved evaluation report to {report_file}")
+            else:
+                report = _evaluate_predictions(true_labels, predicted_labels)
+            l2_queue.put(None)
 
 
 def run_l2(l1_queue: queue.Queue = None, l2_out_queue: queue.Queue = None):
