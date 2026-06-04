@@ -50,8 +50,6 @@ def _set_va_range(values: list[int], num_classes: int) -> list[int]:
     if num_classes == 5:
         return [value - 1 for value in values]
 
-    if num_classes == -2:
-        return [0 if value <= 2 else 1 if value == 3 else 2 for value in values]
     # Map 1..5 to 0..(num_classes-1), keeping midpoint stable for num_classes=3
     return [
         max(
@@ -74,10 +72,10 @@ def _process_pow_vectors(
     feat_select = FeatureSelector()
     df_pow = df.reindex(columns=pow_columns)
 
-    return [
-        feat_select.process_data(normalizer.new_row(list(row)))
-        for row in df_pow.itertuples(index=False, name=None)
-    ]
+    rows = df_pow.to_numpy()
+    rows = normalizer.process_batch(rows)
+
+    return feat_select.process_data_batch(rows)
 
 
 def _collect_training_data(
@@ -93,7 +91,6 @@ def _collect_training_data(
     people = df["subject_id"].tolist()
     normalizer = EPOCCrossSessionNormalizer(is_epoch_data=False)
     pow_vectors = _process_pow_vectors(df, pow_columns, normalizer)
-    print(f"Collected {len(pow_vectors)} training samples from {feather_path}")
     return pow_vectors, labels, people
 
 

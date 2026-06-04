@@ -292,7 +292,7 @@ classifier_hyperparameters:
 # Number of classes to predict. Same numer for both for valence and arousal.
 # Only tested for 1, 3 and 5 classes of each
 # The real number of classes will be num_classes^2, as we are predicting both valence and arousal states.
-num_classes: -2
+num_classes: 3
 
 # Classification class balancing configuration
 # Options:

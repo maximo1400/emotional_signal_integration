@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 import numpy as np
+import multiprocessing
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -94,6 +95,13 @@ class FeatureSelector:
         features = self.add_features(pow_arr)
         filtered_pow = pow_arr[pow_columns_mask_np].tolist()
         return filtered_pow + features
+
+    def process_data_batch(self, pow_rows: list[list[float]]) -> List[List[float]]:
+        """Processes a batch of power data vectors using multiprocessing."""
+        num_cores = multiprocessing.cpu_count()
+        with multiprocessing.Pool(processes=num_cores) as pool:
+            result = pool.map(self.process_data, pow_rows, chunksize=1024)
+        return result
 
     def get_final_feature_names(self) -> List[str]:
         """Get the names and order of [pow_col, asym, features, timestamp] after selection and addition."""

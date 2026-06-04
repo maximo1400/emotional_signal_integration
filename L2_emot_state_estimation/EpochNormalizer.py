@@ -47,3 +47,14 @@ class EPOCCrossSessionNormalizer:
 
         self._calibrate_session(pow_row)
         return self._transform(pow_row)
+
+    def process_batch(self, pow_rows: np.ndarray) -> list[list[float]]:
+        if not self.is_epoch_data:
+            return pow_rows.tolist()
+
+        normalized_rows = []
+        for row in pow_rows:
+            row = row.tolist()
+            self._calibrate_session(row)
+            normalized_rows.append(self._transform(row))
+        return normalized_rows
