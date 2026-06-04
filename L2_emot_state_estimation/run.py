@@ -12,19 +12,14 @@ import sys
 import time
 from pathlib import Path
 import queue
-import csv
 import pandas as pd
 
 from L2_emot_state_estimation.EpochNormalizer import EPOCCrossSessionNormalizer
 from L2_emot_state_estimation.classifier import ClassifierManager
 from L2_emot_state_estimation.featureSelection import FeatureSelector
-from L2_emot_state_estimation.utils import plot_confusion_matrix
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    precision_score,
-    recall_score,
-    f1_score,
+from L2_emot_state_estimation.utils import (
+    PredictionWriter,
+    _evaluate_predictions,
 )
 
 # Add parent directory to path to import config_loader
@@ -105,106 +100,6 @@ def _build_output_file(
     if create_dir:
         output_folder.mkdir(parents=True, exist_ok=True)
     return output_folder / filename
-
-
-def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str]]:
-    valence = []
-    arousal = []
-
-    for label in labels:
-        va, ar = str(label).split("_")
-        valence.append(va)
-        arousal.append(ar)
-
-    return valence, arousal
-
-
-def _evaluate_predictions(
-    true_y: list[str],
-    pred_y: list[str],
-    output_dir: Path | str,
-    save_png: bool = True,
-) -> dict[str, list[str]]:
-    true_val, true_ar = _split_va_labels(true_y)
-    pred_val, pred_ar = _split_va_labels(pred_y)
-
-    val_acc = accuracy_score(true_val, pred_val)
-    ar_acc = accuracy_score(true_ar, pred_ar)
-    joint_acc = accuracy_score(true_y, pred_y)
-
-    val_prec = precision_score(true_val, pred_val, average="weighted", zero_division=0)
-    val_rec = recall_score(true_val, pred_val, average="weighted", zero_division=0)
-    val_f1 = f1_score(true_val, pred_val, average="weighted", zero_division=0)
-
-    ar_prec = precision_score(true_ar, pred_ar, average="weighted", zero_division=0)
-    ar_rec = recall_score(true_ar, pred_ar, average="weighted", zero_division=0)
-    ar_f1 = f1_score(true_ar, pred_ar, average="weighted", zero_division=0)
-
-    joint_prec = precision_score(true_y, pred_y, average="weighted", zero_division=0)
-    joint_rec = recall_score(true_y, pred_y, average="weighted", zero_division=0)
-    joint_f1 = f1_score(true_y, pred_y, average="weighted", zero_division=0)
-
-    class_report = classification_report(true_y, pred_y, zero_division=0)
-    valence_report = classification_report(true_val, pred_val, zero_division=0)
-    arousal_report = classification_report(true_ar, pred_ar, zero_division=0)
-
-    print("Valence accuracy:", val_acc)
-    print("Arousal accuracy:", ar_acc)
-    print("Joint accuracy:", joint_acc)
-    print("classification_report:\n", class_report)
-
-    png_path = Path(output_dir) / "confusion_matrix.png"
-    plot_confusion_matrix(true_y, pred_y, save_png=save_png, png_path=str(png_path))
-
-    formatted_report = [
-        "Valence Metrics:",
-        f"  Accuracy:  {val_acc:.4f}",
-        f"  Precision: {val_prec:.4f}",
-        f"  Recall:    {val_rec:.4f}",
-        f"  F1 Score:  {val_f1:.4f}",
-        "",
-        "Arousal Metrics:",
-        f"  Accuracy:  {ar_acc:.4f}",
-        f"  Precision: {ar_prec:.4f}",
-        f"  Recall:    {ar_rec:.4f}",
-        f"  F1 Score:  {ar_f1:.4f}",
-        "",
-        "Joint Metrics:",
-        f"  Accuracy:  {joint_acc:.4f}",
-        f"  Precision: {joint_prec:.4f}",
-        f"  Recall:    {joint_rec:.4f}",
-        f"  F1 Score:  {joint_f1:.4f}",
-        "",
-        "Valence Report:\n",
-        valence_report,
-        "Arousal Report:\n",
-        arousal_report,
-        "Joint Report:\n",
-        class_report,
-    ]
-
-    return {
-        "true_valence": true_val,
-        "true_arousal": true_ar,
-        "pred_valence": pred_val,
-        "pred_arousal": pred_ar,
-        "valence_acc": val_acc,
-        "arousal_acc": ar_acc,
-        "Joint_accuracy": joint_acc,
-        "valence_precision": val_prec,
-        "valence_recall": val_rec,
-        "valence_f1": val_f1,
-        "arousal_precision": ar_prec,
-        "arousal_recall": ar_rec,
-        "arousal_f1": ar_f1,
-        "Joint_precision": joint_prec,
-        "Joint_recall": joint_rec,
-        "Joint_f1": joint_f1,
-        "classification_report": class_report,
-        "valence_report": valence_report,
-        "arousal_report": arousal_report,
-        "formatted_report": formatted_report,
-    }
 
 
 def train_model():
@@ -353,12 +248,7 @@ def predict_from_queue(
         create_dir=save_files,
     )
 
-    f = None
-    writer = None
-    if save_files:
-        f = output_file.open("w", newline="", encoding="utf-8")
-        writer = csv.writer(f)
-
+    pred_writer = PredictionWriter(output_file, save_files, true_labels)
     predicted_labels = []
 
     try:
@@ -377,51 +267,32 @@ def predict_from_queue(
 
             pow_values = _row_to_pow_values(row, pow_columns)
             normalized_values = normalizer.new_row(pow_values)
-            pow_vector = feat_select.process_data(normalized_values)
+            pow_row = feat_select.process_data(normalized_values)
 
             if first_loop:
-                if save_files:
-                    features = feat_select.get_final_feature_names()
-                    headers = [
-                        *features,
-                        "y_pred",
-                        "confidence",
-                        "timestamp",
-                    ]
-                    if true_labels is not None:
-                        headers.append("y_true")
-                    writer.writerow(headers)
-                classifier_manager = ClassifierManager(len(pow_vector))
+                pred_writer.write_headers(feat_select.get_final_feature_names())
+                classifier_manager = ClassifierManager(len(pow_row))
                 classifier_manager.load(model_path, num_classes=num_classes)
                 first_loop = False
 
-            prediction = classifier_manager.predict_with_confidence(pow_vector)
+            prediction = classifier_manager.predict_with_confidence(pow_row)
+            prediction_label = prediction["label"]
+            prediction_conf = prediction["confidence"]
             timestamp = time.time()
 
             predicted_labels.append(str(prediction["label"]))
 
-            if save_files:
-                row = [
-                    *pow_vector,
-                    prediction["label"],
-                    prediction["confidence"],
-                    timestamp,
-                ]
-                if true_labels is not None:
-                    row.append(true_labels[len(predicted_labels) - 1])
-                writer.writerow(row)
-                f.flush()
+            pred_writer.write_row(pow_row, prediction_label, prediction_conf, timestamp)
 
             payload = {
-                "label": prediction["label"],
-                "confidence": prediction["confidence"],
+                "label": prediction_label,
+                "confidence": prediction_conf,
                 "timestamp": timestamp,
             }
             l2_queue.put(payload)
             print(f"Classifier output: {payload}")
     finally:
-        if f is not None:
-            f.close()
+        pred_writer.close()
         if verbose and save_files:
             print(f"Saved queue predictions to {output_file}")
 

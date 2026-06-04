@@ -1,10 +1,20 @@
 import numpy as np
+import pandas as pd
 import matplotlib
+import csv
+from pathlib import Path
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+)
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
 
 
 def plot_confusion_matrix(
@@ -78,3 +88,148 @@ def plot_confusion_matrix(
         plt.savefig(png_path, dpi=dpi, bbox_inches="tight")
 
     plt.close()
+
+
+class PredictionWriter:
+    def __init__(
+        self, output_file: Path, save_files: bool, true_labels: list[str] = None
+    ):
+        self.save_files = save_files
+        self.true_labels = true_labels
+        self.predicted_count = 0
+        self.f = None
+        self.writer = None
+
+        if self.save_files:
+            self.f = output_file.open("w", newline="", encoding="utf-8")
+            self.writer = csv.writer(self.f)
+
+    def write_headers(self, feature_names: list[str]):
+        if not self.save_files:
+            return
+        headers = [*feature_names, "y_pred", "confidence", "timestamp"]
+        if self.true_labels is not None:
+            headers.append("y_true")
+        self.writer.writerow(headers)
+
+    def write_row(
+        self,
+        pow_vector: list[float],
+        prediction_label: str,
+        prediction_confidence: float,
+        timestamp: float,
+    ):
+        if not self.save_files:
+            self.predicted_count += 1
+            return
+
+        row = [*pow_vector, prediction_label, prediction_confidence, timestamp]
+        if self.true_labels is not None:
+            row.append(self.true_labels[self.predicted_count])
+        self.writer.writerow(row)
+        self.f.flush()
+        self.predicted_count += 1
+
+    def close(self):
+        if self.f is not None:
+            self.f.close()
+
+
+def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str]]:
+    valence = []
+    arousal = []
+
+    for label in labels:
+        va, ar = str(label).split("_")
+        valence.append(va)
+        arousal.append(ar)
+
+    return valence, arousal
+
+
+def _evaluate_predictions(
+    true_y: list[str],
+    pred_y: list[str],
+    output_dir: Path | str,
+    save_png: bool = True,
+) -> dict[str, list[str]]:
+    true_val, true_ar = _split_va_labels(true_y)
+    pred_val, pred_ar = _split_va_labels(pred_y)
+
+    val_acc = accuracy_score(true_val, pred_val)
+    ar_acc = accuracy_score(true_ar, pred_ar)
+    joint_acc = accuracy_score(true_y, pred_y)
+
+    val_prec = precision_score(true_val, pred_val, average="weighted", zero_division=0)
+    val_rec = recall_score(true_val, pred_val, average="weighted", zero_division=0)
+    val_f1 = f1_score(true_val, pred_val, average="weighted", zero_division=0)
+
+    ar_prec = precision_score(true_ar, pred_ar, average="weighted", zero_division=0)
+    ar_rec = recall_score(true_ar, pred_ar, average="weighted", zero_division=0)
+    ar_f1 = f1_score(true_ar, pred_ar, average="weighted", zero_division=0)
+
+    joint_prec = precision_score(true_y, pred_y, average="weighted", zero_division=0)
+    joint_rec = recall_score(true_y, pred_y, average="weighted", zero_division=0)
+    joint_f1 = f1_score(true_y, pred_y, average="weighted", zero_division=0)
+
+    class_report = classification_report(true_y, pred_y, zero_division=0)
+    valence_report = classification_report(true_val, pred_val, zero_division=0)
+    arousal_report = classification_report(true_ar, pred_ar, zero_division=0)
+
+    print("Valence accuracy:", val_acc)
+    print("Arousal accuracy:", ar_acc)
+    print("Joint accuracy:", joint_acc)
+    print("classification_report:\n", class_report)
+
+    png_path = Path(output_dir) / "confusion_matrix.png"
+    plot_confusion_matrix(true_y, pred_y, save_png=save_png, png_path=str(png_path))
+
+    formatted_report = [
+        "Valence Metrics:",
+        f"  Accuracy:  {val_acc:.4f}",
+        f"  Precision: {val_prec:.4f}",
+        f"  Recall:    {val_rec:.4f}",
+        f"  F1 Score:  {val_f1:.4f}",
+        "",
+        "Arousal Metrics:",
+        f"  Accuracy:  {ar_acc:.4f}",
+        f"  Precision: {ar_prec:.4f}",
+        f"  Recall:    {ar_rec:.4f}",
+        f"  F1 Score:  {ar_f1:.4f}",
+        "",
+        "Joint Metrics:",
+        f"  Accuracy:  {joint_acc:.4f}",
+        f"  Precision: {joint_prec:.4f}",
+        f"  Recall:    {joint_rec:.4f}",
+        f"  F1 Score:  {joint_f1:.4f}",
+        "",
+        "Valence Report:\n",
+        valence_report,
+        "Arousal Report:\n",
+        arousal_report,
+        "Joint Report:\n",
+        class_report,
+    ]
+
+    return {
+        "true_valence": true_val,
+        "true_arousal": true_ar,
+        "pred_valence": pred_val,
+        "pred_arousal": pred_ar,
+        "valence_acc": val_acc,
+        "arousal_acc": ar_acc,
+        "Joint_accuracy": joint_acc,
+        "valence_precision": val_prec,
+        "valence_recall": val_rec,
+        "valence_f1": val_f1,
+        "arousal_precision": ar_prec,
+        "arousal_recall": ar_rec,
+        "arousal_f1": ar_f1,
+        "Joint_precision": joint_prec,
+        "Joint_recall": joint_rec,
+        "Joint_f1": joint_f1,
+        "classification_report": class_report,
+        "valence_report": valence_report,
+        "arousal_report": arousal_report,
+        "formatted_report": formatted_report,
+    }
