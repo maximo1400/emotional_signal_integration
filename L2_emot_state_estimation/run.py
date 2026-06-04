@@ -19,7 +19,13 @@ from L2_emot_state_estimation.EpochNormalizer import EPOCCrossSessionNormalizer
 from L2_emot_state_estimation.classifier import ClassifierManager
 from L2_emot_state_estimation.featureSelection import FeatureSelector
 from L2_emot_state_estimation.utils import plot_confusion_matrix
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    precision_score,
+    recall_score,
+    f1_score,
+)
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -87,7 +93,7 @@ def _collect_training_data(
     people = df["subject_id"].tolist()
     normalizer = EPOCCrossSessionNormalizer(is_epoch_data=False)
     pow_vectors = _process_pow_vectors(df, pow_columns, normalizer)
-
+    print(f"Collected {len(pow_vectors)} training samples from {feather_path}")
     return pow_vectors, labels, people
 
 
@@ -117,38 +123,90 @@ def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str
 
 
 def _evaluate_predictions(
-    true_labels: list[str],
-    predicted_labels: list[str],
+    true_y: list[str],
+    pred_y: list[str],
     output_dir: Path | str,
     save_png: bool = True,
 ) -> dict[str, list[str]]:
-    true_valence, true_arousal = _split_va_labels(true_labels)
-    predicted_valence, predicted_arousal = _split_va_labels(predicted_labels)
+    true_val, true_ar = _split_va_labels(true_y)
+    pred_val, pred_ar = _split_va_labels(pred_y)
 
-    valence_acc = accuracy_score(true_valence, predicted_valence)
-    arousal_acc = accuracy_score(true_arousal, predicted_arousal)
-    joint_acc = accuracy_score(true_labels, predicted_labels)
-    class_report = classification_report(true_labels, predicted_labels, zero_division=0)
+    val_acc = accuracy_score(true_val, pred_val)
+    ar_acc = accuracy_score(true_ar, pred_ar)
+    joint_acc = accuracy_score(true_y, pred_y)
 
-    print("Valence accuracy:", valence_acc)
-    print("Arousal accuracy:", arousal_acc)
+    val_prec = precision_score(true_val, pred_val, average="weighted", zero_division=0)
+    val_rec = recall_score(true_val, pred_val, average="weighted", zero_division=0)
+    val_f1 = f1_score(true_val, pred_val, average="weighted", zero_division=0)
+
+    ar_prec = precision_score(true_ar, pred_ar, average="weighted", zero_division=0)
+    ar_rec = recall_score(true_ar, pred_ar, average="weighted", zero_division=0)
+    ar_f1 = f1_score(true_ar, pred_ar, average="weighted", zero_division=0)
+
+    joint_prec = precision_score(true_y, pred_y, average="weighted", zero_division=0)
+    joint_rec = recall_score(true_y, pred_y, average="weighted", zero_division=0)
+    joint_f1 = f1_score(true_y, pred_y, average="weighted", zero_division=0)
+
+    class_report = classification_report(true_y, pred_y, zero_division=0)
+    valence_report = classification_report(true_val, pred_val, zero_division=0)
+    arousal_report = classification_report(true_ar, pred_ar, zero_division=0)
+
+    print("Valence accuracy:", val_acc)
+    print("Arousal accuracy:", ar_acc)
     print("Joint accuracy:", joint_acc)
     print("classification_report:\n", class_report)
 
     png_path = Path(output_dir) / "confusion_matrix.png"
-    plot_confusion_matrix(
-        true_labels, predicted_labels, save_png=save_png, png_path=str(png_path)
-    )
+    plot_confusion_matrix(true_y, pred_y, save_png=save_png, png_path=str(png_path))
+
+    formatted_report = [
+        "Valence Metrics:",
+        f"  Accuracy:  {val_acc:.4f}",
+        f"  Precision: {val_prec:.4f}",
+        f"  Recall:    {val_rec:.4f}",
+        f"  F1 Score:  {val_f1:.4f}",
+        "",
+        "Arousal Metrics:",
+        f"  Accuracy:  {ar_acc:.4f}",
+        f"  Precision: {ar_prec:.4f}",
+        f"  Recall:    {ar_rec:.4f}",
+        f"  F1 Score:  {ar_f1:.4f}",
+        "",
+        "Joint Metrics:",
+        f"  Accuracy:  {joint_acc:.4f}",
+        f"  Precision: {joint_prec:.4f}",
+        f"  Recall:    {joint_rec:.4f}",
+        f"  F1 Score:  {joint_f1:.4f}",
+        "",
+        "Valence Report:\n",
+        valence_report,
+        "Arousal Report:\n",
+        arousal_report,
+        "Joint Report:\n",
+        class_report,
+    ]
 
     return {
-        "true_valence": true_valence,
-        "true_arousal": true_arousal,
-        "pred_valence": predicted_valence,
-        "pred_arousal": predicted_arousal,
-        "valence_acc": valence_acc,
-        "arousal_acc": arousal_acc,
+        "true_valence": true_val,
+        "true_arousal": true_ar,
+        "pred_valence": pred_val,
+        "pred_arousal": pred_ar,
+        "valence_acc": val_acc,
+        "arousal_acc": ar_acc,
         "Joint_accuracy": joint_acc,
+        "valence_precision": val_prec,
+        "valence_recall": val_rec,
+        "valence_f1": val_f1,
+        "arousal_precision": ar_prec,
+        "arousal_recall": ar_rec,
+        "arousal_f1": ar_f1,
+        "Joint_precision": joint_prec,
+        "Joint_recall": joint_rec,
+        "Joint_f1": joint_f1,
         "classification_report": class_report,
+        "valence_report": valence_report,
+        "arousal_report": arousal_report,
+        "formatted_report": formatted_report,
     }
 
 
@@ -223,14 +281,7 @@ def train_model():
     output_frame.to_csv(output_file, index=False)
 
     report_file = output_file.with_name("evaluation.txt")
-    report_filtered = [
-        f"valence_acc: {eval_data['valence_acc']:.4f}",
-        f"arousal_acc: {eval_data['arousal_acc']:.4f}",
-        f"Joint_accuracy: {eval_data['Joint_accuracy']:.4f}",
-        "classification_report:\n",
-        eval_data["classification_report"],
-    ]
-    report_file.write_text("\n".join(report_filtered), encoding="utf-8")
+    report_file.write_text("\n".join(eval_data["formatted_report"]), encoding="utf-8")
 
     print(f"Saved train/test comparison to {output_file}")
     print(f"Saved evaluation report to {report_file}")
@@ -387,14 +438,9 @@ def predict_from_queue(
                     save_png=save_files,
                 )
                 report_file = output_file.with_name("evaluation.txt")
-                report_fitered = [
-                    f"valence_acc: {report['valence_acc']:.4f}",
-                    f"arousal_acc: {report['arousal_acc']:.4f}",
-                    f"Joint_accuracy: {report['Joint_accuracy']:.4f}",
-                    "classification_report:\n",
-                    report["classification_report"],
-                ]
-                report_file.write_text("\n".join(report_fitered), encoding="utf-8")
+                report_file.write_text(
+                    "\n".join(report["formatted_report"]), encoding="utf-8"
+                )
 
                 print(f"Saved evaluation report to {report_file}")
             else:
