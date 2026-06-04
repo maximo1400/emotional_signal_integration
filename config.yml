@@ -243,8 +243,8 @@ features_to_add: [
 ]
 
 # Classifier
-# Options: "random_forest", "svm", "knn"
-classifier: random_forest  # Classifier to use for emotion state estimation in Layer 2
+# Options: "random_forest", "svm", "knn", "balanced_random_forest"
+classifier: balanced_random_forest  # Classifier to use for emotion state estimation in Layer 2
 # Mode for the classifier. Options:
 # - "train": Train the classifier using the processed data from DREAMER.
 # - "predict_from_queue": Load a trained model from file and use it to make predictions on incoming data from L1 queue.
@@ -261,6 +261,7 @@ models_names:
   random_forest: random_forest.joblib
   svm: svm.joblib
   knn: knn.joblib
+  balanced_random_forest: balanced_random_forest.joblib
 
 # Hyperparameters for the classifiers
 classifier_hyperparameters:
@@ -281,18 +282,24 @@ classifier_hyperparameters:
     n_neighbors: 5
     weights: distance
     n_jobs: -1
+  balanced_random_forest:
+    n_estimators: 100
+    class_weight: balanced_subsample
+    max_depth: 10
+    random_state: 42
+    n_jobs: -1
 
 # Number of classes to predict. Same numer for both for valence and arousal.
 # Only tested for 1, 3 and 5 classes of each
 # The real number of classes will be num_classes^2, as we are predicting both valence and arousal states.
-num_classes: 3
+num_classes: -2
 
 # Classification class balancing configuration
 # Options:
 # - "none": No class balancing, use the original class distribution from the dataset.
 # - "undersample": Undersample the majority classes by randomly removing samples until all classes have the same number of samples.
 # - "oversample": Oversample the minority classes by randomly duplicating samples until all classes have the same number of samples.
-class_balancing: undersample  # Class balancing method to use for training the classifier
+class_balancing: none  # Class balancing method to use for training the classifier
 
 # Method to separate training and testing data. Options:
 # - "random": Randomly split the data into training and testing sets.

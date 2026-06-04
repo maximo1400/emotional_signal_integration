@@ -11,3 +11,4 @@ websocket-client
 python-dispatch
 scikit-learn
 joblib
+imbalanced-learn

@@ -20,12 +20,14 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
+from imblearn.ensemble import BalancedRandomForestClassifier
 
 
 CLASSIFIERS = {
     "knn": KNeighborsClassifier,
     "svm": SVC,
     "random_forest": RandomForestClassifier,
+    "balanced_random_forest": BalancedRandomForestClassifier,
 }
 
 
