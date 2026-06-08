@@ -20,7 +20,7 @@ def main() -> None:
         "feather_file_path",
         "pow_data_source",
     ])
-    print(f"startimg on timestamp: {time.time()}")
+    print(f"Starting on timestamp: {time.time()}")
     classif_mode = config["classifier_mode"]
     listen_out = config["start_socket_listener"]
     pow_file_path = config["feather_file_path"]
