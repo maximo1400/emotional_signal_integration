@@ -69,12 +69,14 @@ def _split_data(
     else:
         raise ValueError(f"Invalid data split method: {method}")
 
-    splits = []
+    # Exclude test subjects from training data if specified
     if len(test_subjects) > 0:
+        splits = []
         for train_idx, test_idx in splits_indices:
             train_mask = ~np.isin(people_arr[train_idx], test_subjects)
             train_idx = train_idx[train_mask]
-            splits.append((X[train_idx], X[test_idx], y[train_idx], y[test_idx]))
+            if len(train_idx) > 0:
+                splits.append((X[train_idx], X[test_idx], y[train_idx], y[test_idx]))
         return splits
 
     return [
@@ -248,18 +250,24 @@ class ClassifierManager:
             all_y_pred.extend(y_pred)
 
         print("--- Training Final Model on Full Dataset ---")
+        test_subjects = data_split_params["test_subjects"]
+        if len(test_subjects) > 0:
+            people_arr = np.array(people, dtype=int)
+            train_mask = ~np.isin(people_arr, test_subjects)
+            X_final = X[train_mask]
+            y_final = y[train_mask]
+        else:
+            X_final = X
+            y_final = y
+
         X_full_bal, y_full_bal = _apply_class_balancing(
-            X,
-            y,
+            X_final,
+            y_final,
             method=class_balancing,
         )
         final_model = _build_estimator(name, hyperparams)
-        final_model.fit(X_full_bal, y_full_bal)
-
         self.active_model = final_model
-        self.active_name = name
-        self.active_hyperparams = hyperparams
-        self.active_num_classes = num_classes
+        final_model.fit(X_full_bal, y_full_bal)
 
         if model_path:
             self.save_model(model_path)
