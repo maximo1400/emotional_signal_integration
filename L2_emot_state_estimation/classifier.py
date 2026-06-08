@@ -17,7 +17,7 @@ import joblib
 import numpy as np
 import warnings
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, StratifiedGroupKFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from imblearn.ensemble import BalancedRandomForestClassifier
@@ -49,26 +49,38 @@ def _split_data(
     y: np.ndarray,
     method: str,
     parameters: dict,
-    people: list[int] | None,  # Optional
-    stratify: bool,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    people: list[int],
+    stratify: bool = True,
+) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
     """Split data into train/test sets based on the specified method."""
-    if method == "random":
-        return train_test_split(
-            X,
-            y,
-            test_size=parameters["random"]["test_size"],
-            random_state=parameters["random"]["random_state"],
-            stratify=y if stratify else None,
-        )
+    test_subjects = parameters["test_subjects"]
+    people_arr = np.array(people, dtype=int)
 
-    if method == "subject":
-        people = np.asarray(people)
-        test_subjects = parameters["subject"]["test_subjects"]
-        test_mask = np.isin(people, test_subjects)
-        return X[~test_mask], X[test_mask], y[~test_mask], y[test_mask]
+    if method == "loso":
+        logo = LeaveOneGroupOut()
+        splits_indices = logo.split(X, y, groups=people_arr)
+    elif method == "group_kfold":
+        n_splits = parameters["group_kfold"]["n_splits"]
+        if stratify:
+            gkf = StratifiedGroupKFold(n_splits=n_splits)
+        else:
+            gkf = GroupKFold(n_splits=n_splits)
+        splits_indices = gkf.split(X, y, groups=people_arr)
+    else:
+        raise ValueError(f"Invalid data split method: {method}")
 
-    raise ValueError(f"Invalid data split method: {method}")
+    splits = []
+    if len(test_subjects) > 0:
+        for train_idx, test_idx in splits_indices:
+            train_mask = ~np.isin(people_arr[train_idx], test_subjects)
+            train_idx = train_idx[train_mask]
+            splits.append((X[train_idx], X[test_idx], y[train_idx], y[test_idx]))
+        return splits
+
+    return [
+        (X[train_idx], X[test_idx], y[train_idx], y[test_idx])
+        for train_idx, test_idx in splits_indices
+    ]
 
 
 def _apply_class_balancing(
@@ -198,51 +210,64 @@ class ClassifierManager:
         num_classes: int,
         class_balancing: str,
         data_split_method: str,
-        data_split_parameters: dict,
+        data_split_params: dict,
         people: list[int],
         stratify: bool = True,
     ):
         X = np.asarray(pow_vectors, dtype=float)
         y = np.asarray(labels)
 
-        X_train, X_test, y_train, y_test = _split_data(
-            X,
-            y,
-            data_split_method,
-            data_split_parameters,
-            people,
-            stratify,
+        splits = _split_data(
+            X, y, data_split_method, data_split_params, people, stratify
         )
 
-        print(f"X_train size: {len(X_train)}, X_test size: {len(X_test)}")
+        all_y_test = []
+        all_y_pred = []
 
-        X_train, y_train = _apply_class_balancing(
-            X_train,
-            y_train,
-            method=class_balancing,
-        )
-
-        print(
-            f"X_train size after balancing: {len(X_train)}, X_test size: {len(X_test)}"
-        )
-
-        model = _build_estimator(name, hyperparams)
-        model.fit(X_train, y_train)
-
-        self.active_model = model
+        # Classifier model info
         self.active_name = name
         self.active_hyperparams = hyperparams
         self.active_num_classes = num_classes
 
-        y_pred = self.batch_predict(X_test)
+        print(f"Training using method: {data_split_method} with {len(splits)} split(s)")
+
+        for fold_idx, (X_train, X_test, y_train, y_test) in enumerate(splits):
+            print(f"--- Fold {fold_idx + 1} ---")
+
+            X_train_bal, y_train_bal = _apply_class_balancing(
+                X_train,
+                y_train,
+                method=class_balancing,
+            )
+            model = _build_estimator(name, hyperparams)
+            self.active_model = model
+            model.fit(X_train_bal, y_train_bal)
+
+            y_pred = self.batch_predict(X_test)
+            all_y_test.extend(y_test)
+            all_y_pred.extend(y_pred)
+
+        print("--- Training Final Model on Full Dataset ---")
+        X_full_bal, y_full_bal = _apply_class_balancing(
+            X,
+            y,
+            method=class_balancing,
+        )
+        final_model = _build_estimator(name, hyperparams)
+        final_model.fit(X_full_bal, y_full_bal)
+
+        self.active_model = final_model
+        self.active_name = name
+        self.active_hyperparams = hyperparams
+        self.active_num_classes = num_classes
 
         if model_path:
             self.save_model(model_path)
 
         return {
             "model": self.active_model,
-            "y_test": y_test,
-            "y_pred": np.asarray(y_pred),
+            "y_test": np.asarray(all_y_test),
+            "y_pred": np.asarray(all_y_pred),
         }
 
     def predict(self, pow_vector: list[float]) -> str:
