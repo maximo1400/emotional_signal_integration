@@ -14,8 +14,8 @@ from L3_va_data_adaptation.smoother import DataSmoother
 
 
 def parse_label(label_str: str) -> tuple[float, float]:
-    """Parses 'v_a' label into valence and arousal floats."""
-    v, a = label_str.split("_")
+    """Parses 'v-a' label into valence and arousal floats."""
+    v, a = label_str.split("-")
     return float(v), float(a)
 
 

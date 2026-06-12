@@ -140,7 +140,7 @@ def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str
     arousal = []
 
     for label in labels:
-        va, ar = str(label).split("_")
+        va, ar = str(label).split("-")
         valence.append(va)
         arousal.append(ar)
 

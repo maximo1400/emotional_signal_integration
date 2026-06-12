@@ -20,6 +20,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, StratifiedGroupKFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
+from sklearn.calibration import CalibratedClassifierCV
 from imblearn.ensemble import BalancedRandomForestClassifier
 
 
@@ -37,9 +38,11 @@ def _build_estimator(name: str, hyperparams: dict[str, Any]):
 
     params = dict(hyperparams or {})
 
-    # SVM needs probability=True to enable confidence outputs
+    # SVM needs CalibratedClassifierCV to enable confidence outputs
     if name == "svm":
-        params.setdefault("probability", True)
+        params.pop("probability", None)
+        base_estimator = CLASSIFIERS[name](**params)
+        return CalibratedClassifierCV(base_estimator, ensemble=False)
 
     return CLASSIFIERS[name](**params)
 

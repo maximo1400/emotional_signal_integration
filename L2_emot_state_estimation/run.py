@@ -56,7 +56,7 @@ def _set_va_range(values: list[int], num_classes: int) -> list[int]:
 
 
 def _va_to_label(val: list[int], ar: list[int]) -> list[str]:
-    return [f"{v}_{a}" for v, a in zip(val, ar)]
+    return [f"{v}-{a}" for v, a in zip(val, ar)]
 
 
 def _process_pow_vectors(

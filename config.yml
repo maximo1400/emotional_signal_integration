@@ -38,7 +38,7 @@ sub_id: 4
 
 #If using virtual data, you can smoothly transition between emotional states by specifying a transition duration in seconds. 
 # Set to 0 for instant transitions, or a positive value (e.g., 1.0) for gradual transitions.
-transition_duration: 0  
+transition_duration: 0
 
 # If using virtual data, specify the sequence of emotional states to simulate. 
 #You can choose from predefined sequences or define your own.
@@ -71,6 +71,7 @@ sequences:
 # Path to the .mat file containing the DREAMER raw data
 dreamer_mat_path: Dreamer/DREAMER.mat
 # Path to the feather file containing the pow data
+# feather_file_path: Dreamer/pow.feather
 feather_file_path: Dreamer/pow_filtered.feather
 # Define the range of valence and arousal values for the emotional states.
 # Used to normalize the simulated emotional states.
@@ -200,8 +201,9 @@ l2_output_folder: L2_emot_state_estimation/output_data  # Folder path to save th
 
 ## Feature selection configuration for Layer 2
 # If it's needed, you can specify wich pow_column you wish to use for the classifier in layer 2. 
+# (e.g., ["AF3/theta", "F7/alpha"])
 # If empty, all columns will be used.
-l2_pow_columns: []  # List of pow columns to use for feature selection in Layer 2 (e.g., ["AF3/theta", "F7/alpha"])
+l2_pow_columns: []   
 # Extra features to add
 # Asymmetries capture relative differences in brain activity.
 # Extra information on how to calculate them can be found in the L2_emot_state_estimation/features_documentation.md file.
@@ -284,7 +286,7 @@ classifier_hyperparameters:
     n_jobs: -1
   balanced_random_forest:
     n_estimators: 100
-    class_weight: balanced_subsample
+    class_weight: balanced
     max_depth: 10
     random_state: 42
     n_jobs: -1
@@ -302,11 +304,11 @@ num_classes: 3
 class_balancing: none  # Class balancing method to use for training the classifier
 
 # Method to separate training and testing data. Options:
-# - "group_kfold": Group K-Fold cross validation ensuring subjects are grouped into folds.
-# - "loso": Leave-One-Subject-Out cross validation, tests on one subject at a time.
+# - "loso": Leave-One-Subject-Out cross validation, tests on one subject at a time. (slow)
+# - "group_kfold": Group K-Fold cross validation ensuring subjects are grouped into folds. (faster)
 data_split_method: loso
 data_split_parameters:
-  test_subjects: [4]  # any subject ID or list of IDs to ignore during training and use for testing
+  test_subjects: [4]  # List of IDs to ignore during training 
   group_kfold:
     n_splits: 5
 
@@ -320,7 +322,7 @@ l3_output_folder: L3_va_data_adaptation/output_data
 #   the per-update class jump using max_step_delta (e.g., 1->2 with delta 1,
 #   1->3 with delta 2, but not 1->5 if max_step_delta is 2)
 # - none: no smoothing
-smoothing_method: steps
+smoothing_method: none
 
 # Configurations for the smoothing algorithms
 smoothing_parameters:
@@ -330,6 +332,7 @@ smoothing_parameters:
     alpha: 0.2  # Smoothing factor between 0 and 1. Lower means more smoothing.
   steps:
     max_step_delta: 1  # Max class jump per update (1=adjacent, 2=can skip one)
+  none: {}  # No parameters needed for no smoothing
 # Socket configuration for outputting the smoothed data
 socket_config: {host: 127.0.0.1, port: 65432, protocol: tcp}
 
