@@ -92,7 +92,7 @@ def plot_confusion_matrix(
 
 class PredictionWriter:
     def __init__(
-        self, output_file: Path, save_files: bool, true_labels: list[str] = None
+        self, output_file: Path, save_files: bool, true_labels: list[str] | None = None
     ):
         self.save_files = save_files
         self.true_labels = true_labels
@@ -105,7 +105,7 @@ class PredictionWriter:
             self.writer = csv.writer(self.f)
 
     def write_headers(self, feature_names: list[str]):
-        if not self.save_files:
+        if not self.save_files or self.writer is None:
             return
         headers = [*feature_names, "y_pred", "confidence", "timestamp"]
         if self.true_labels is not None:
@@ -119,7 +119,7 @@ class PredictionWriter:
         prediction_confidence: float,
         timestamp: float,
     ):
-        if not self.save_files:
+        if not self.save_files or self.writer is None or self.f is None:
             self.predicted_count += 1
             return
 

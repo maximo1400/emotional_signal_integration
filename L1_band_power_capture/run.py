@@ -73,6 +73,8 @@ def run_l1(l1_out_queue: queue.Queue):
                 config["L1_output_folder"],
                 config["pow_data_source"],
             )
+            if simulator.output_df is None:
+                raise ValueError("output_df not generated")
             simulator.output_df.to_csv(f"{output_path}/pow.csv")
         return
 

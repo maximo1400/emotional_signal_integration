@@ -11,7 +11,7 @@ Prediction API:
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import joblib
 import numpy as np
@@ -24,7 +24,15 @@ from sklearn.calibration import CalibratedClassifierCV
 from imblearn.ensemble import BalancedRandomForestClassifier
 
 
-CLASSIFIERS = {
+ClassifierModel: TypeAlias = (
+    KNeighborsClassifier
+    | SVC
+    | RandomForestClassifier
+    | BalancedRandomForestClassifier
+    | CalibratedClassifierCV
+)
+
+CLASSIFIERS: dict[str, type[ClassifierModel]] = {
     "knn": KNeighborsClassifier,
     "svm": SVC,
     "random_forest": RandomForestClassifier,
@@ -32,7 +40,7 @@ CLASSIFIERS = {
 }
 
 
-def _build_estimator(name: str, hyperparams: dict[str, Any]):
+def _build_estimator(name: str, hyperparams: dict[str, Any]) -> ClassifierModel:
     if name not in CLASSIFIERS:
         raise ValueError(f"Classifier '{name}' not registered")
 
@@ -131,14 +139,15 @@ class ClassifierManager:
 
     def __init__(self, input_len: int):
         self.input_len = input_len
-        self.active_model = None
+        self.active_model: ClassifierModel | None = None
         self.active_name: str | None = None
         self.active_hyperparams: dict[str, Any] | None = None
         self.active_num_classes: int | None = None
 
-    def _ensure_active(self):
+    def _ensure_active(self) -> ClassifierModel:
         if self.active_model is None:
             raise RuntimeError("No classifier selected")
+        return self.active_model
 
     def _warn_on_metadata_mismatch(
         self,
@@ -288,18 +297,14 @@ class ClassifierManager:
         return self.batch_predict_with_confidence([pow_vector])[0]
 
     def batch_predict(self, pow_vectors: list[list[float]] | np.ndarray) -> list[str]:
-        self._ensure_active()
-
-        model = self.active_model
+        model: ClassifierModel = self._ensure_active()
         features = np.asarray(pow_vectors, dtype=float)
         return [str(prediction) for prediction in model.predict(features)]
 
     def batch_predict_with_confidence(
         self, pow_vectors: list[list[float]]
     ) -> list[dict[str, Any]]:
-        self._ensure_active()
-
-        model = self.active_model
+        model: ClassifierModel = self._ensure_active()
         features = np.asarray(pow_vectors, dtype=float)
 
         if hasattr(model, "predict_proba"):

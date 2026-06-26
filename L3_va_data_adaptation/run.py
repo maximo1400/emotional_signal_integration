@@ -67,6 +67,8 @@ def run_l3(l2_out_queue: queue.Queue):
         f = None
         writer = None
         if save_files:
+            if output_file is None:
+                raise ValueError("output_file not set")
             f = output_file.open("w", newline="", encoding="utf-8")
             writer = csv.writer(f)
             writer.writerow([
@@ -98,6 +100,8 @@ def run_l3(l2_out_queue: queue.Queue):
             }
 
             if save_files:
+                if writer is None or f is None:
+                    raise ValueError("Writer not initialized")
                 writer.writerow([
                     payload["raw_valence"],
                     payload["raw_arousal"],

@@ -56,8 +56,11 @@ class Subcribe:
         self.c.bind(inform_error=self.on_inform_error)
         self.data = {}
         self.verbose = verbose
+        self.profile_lists: dict | None = None
 
-    def start(self, profile_name, streams, queue: queue, headsetId="", stop_event=None):
+    def start(
+        self, profile_name, streams, queue: queue.Queue, headsetId="", stop_event=None
+    ):
         """
         To start training process as below workflow
         (1) check access right -> authorize -> connect headset->create session
@@ -170,8 +173,11 @@ class Subcribe:
     def on_query_profile_done(self, *args, **kwargs):
         if self.verbose:
             print("on_query_profile_done")
-        self.profile_lists = kwargs.get("data")
-        if self.profile_name in self.profile_lists:
+        profile_lists = kwargs.get("data")
+        self.profile_lists = profile_lists
+        if profile_lists is None:
+            return
+        if self.profile_name in profile_lists:
             # the profile is existed
             self.c.get_current_profile()
         else:
@@ -200,6 +206,8 @@ class Subcribe:
 
     def on_new_data_labels(self, *args, **kwargs):
         data = kwargs.get("data")
+        if not isinstance(data, dict):
+            return
         if self.verbose:
             print("on_new_data_labels")
         # print(data)
@@ -221,6 +229,8 @@ class Subcribe:
 
     def on_inform_error(self, *args, **kwargs):
         error_data = kwargs.get("error_data")
+        if not isinstance(error_data, dict):
+            return
         error_code = error_data["code"]
         error_message = error_data["message"]
 
@@ -269,6 +279,8 @@ class Subcribe:
            {'eeg': [99, 0, 4291.795, 4371.795, 4078.461, 4036.41, 4231.795, 0.0, 0], 'time': 1627457774.5166}
         """
         data = kwargs.get("data")
+        if not isinstance(data, dict):
+            return
         timestamp = data["time"]
         eeg_data = data["eeg"] + [timestamp]
         # self.data["eeg"].loc[len(self.data["eeg"])] = eeg_data
@@ -287,6 +299,8 @@ class Subcribe:
         For example: {'mot': [33, 0, 0.493859, 0.40625, 0.46875, -0.609375, 0.968765, 0.187503, -0.250004, -76.563667, -19.584995, 38.281834], 'time': 1627457508.2588}
         """
         data = kwargs.get("data")
+        if not isinstance(data, dict):
+            return
         timestamp = data["time"]
         mot_data = data["mot"] + [timestamp]
         self.data["mot"].loc[len(self.data["mot"])] = mot_data
@@ -304,6 +318,7 @@ class Subcribe:
         For example:  {'signal': 1.0, 'dev': [4, 4, 4, 4, 4, 100], 'batteryPercent': 80, 'time': 1627459265.4463}
         """
         data = kwargs.get("data")
+        assert isinstance(data, dict)
         timestamp = data["time"]
         dev_data = data["dev"] + [timestamp]
         self.data["dev"].loc[len(self.data["dev"])] = dev_data
@@ -321,6 +336,7 @@ class Subcribe:
         For example: {'met': [True, 0.5, True, 0.5, 0.0, True, 0.5, True, 0.5, True, 0.5, True, 0.5], 'time': 1627459390.4229}
         """
         data = kwargs.get("data")
+        assert isinstance(data, dict)
         timestamp = data["time"]
         met_data = data["met"] + [timestamp]
         self.data["met"].loc[len(self.data["met"])] = met_data
@@ -338,6 +354,7 @@ class Subcribe:
         For example: {'pow': [5.251, 4.691, 3.195, 1.193, 0.282, 0.636, 0.929, 0.833, 0.347, 0.337, 7.863, 3.122, 2.243, 0.787, 0.496, 5.723, 2.87, 3.099, 0.91, 0.516, 5.783, 4.818, 2.393, 1.278, 0.213], 'time': 1627459390.1729}
         """
         data = kwargs.get("data")
+        assert isinstance(data, dict)
         timestamp = data["time"]
         pow_data = data["pow"] + [timestamp]
         self.data["pow"].loc[len(self.data["pow"])] = pow_data
@@ -350,6 +367,8 @@ class Subcribe:
 
     def on_new_com_data(self, *args, **kwargs):
         data = kwargs.get("data")
+        if not isinstance(data, dict):
+            return
         com_data = list(data.values())
         self.data["com"].loc[len(self.data["com"])] = com_data
         if self.verbose:
@@ -357,6 +376,8 @@ class Subcribe:
 
     def on_new_fe_data(self, *args, **kwargs):
         data = kwargs.get("data")
+        if not isinstance(data, dict):
+            return
         fe_data = list(data.values())
         self.data["fac"].loc[len(self.data["fac"])] = fe_data
         if self.verbose:

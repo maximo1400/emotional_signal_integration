@@ -18,9 +18,9 @@ class EmotionSimulator:
     sequence = []
     sub_id = None
     data_frec = None
-    data: pandas.DataFrame = None
-    out_queue: queue.Queue = None
-    output_df: pandas.DataFrame = None
+    data: pandas.DataFrame | None = None
+    out_queue: queue.Queue | None = None
+    output_df: pandas.DataFrame | None = None
     output_rows = []
     emotiv_columns = []
     emot_states = []
@@ -76,6 +76,8 @@ class EmotionSimulator:
         self.data = feather.read_feather(self.file_path)
 
         # normalize valence and arousal to self.emotion_range
+        if self.emotion_range is None:
+            raise ValueError("emotion_range is not set")
         emot_min, emot_max = self.emotion_range
 
         val = self.data["valence"]
@@ -95,7 +97,8 @@ class EmotionSimulator:
     def add_emot_states(self):
         """Assigns an emotional state to each row in self.data based on the valence and arousal values
         and the defined emotional state areas."""
-
+        if self.data is None:
+            raise ValueError("Data not loaded")
         self.data["state"] = "NA"  # Default state
         for state, ranges in self.emot_states_area.items():
             va_min, va_max = ranges["va"]
@@ -114,6 +117,8 @@ class EmotionSimulator:
 
     def get_emotion_pow(self, verbose=False):
         "Organizes the power data by emotional state and initializes the read counters."
+        if self.data is None:
+            raise ValueError("Data not loaded")
         for emot in self.emot_states:
             emot_state_mask = self.data["state"] == emot
             subject_mask = self.data["subject_id"] == self.sub_id
@@ -160,6 +165,8 @@ class EmotionSimulator:
             state = input(msg)
             if state == "q":
                 self.finalize_output_df()
+                if self.out_queue is None:
+                    raise ValueError("Queue not initialized")
                 self.out_queue.put(None)  # Signal to any consumer that we're done
                 break
             msg = self.decode_msg_num(int(state))
@@ -218,11 +225,15 @@ class EmotionSimulator:
                 if self.pow_read[state] >= self.pow_by_state[state].shape[0]:
                     self.pow_read[state] = 0
 
+                if self.data_frec is None:
+                    raise ValueError("data_frec is not set")
                 time.sleep(1 / self.data_frec)
                 t_cur = time.time()
 
     def update_queue(self, pow) -> None:
         "adds the new pow data to the output queue"
+        if self.out_queue is None:
+            raise ValueError("Queue not initialized")
         self.out_queue.put(pow)
         print(f"new data put in queue, mean: {sum(pow) / len(pow):.4f}")
 
@@ -243,12 +254,14 @@ class EmotionSimulator:
         self.output_df = pandas.DataFrame(self.output_rows, columns=columns)
 
     def plot_emotion_distribution(self):
+        if self.data is None:
+            raise ValueError("Data not loaded")
         plt.figure(figsize=(10, 6))
 
         # Define colors for each state
-        colors = plt.cm.tab10.colors
+        cmap = plt.get_cmap("tab10")
         state_colors = {
-            state: colors[i % len(colors)]
+            state: cmap(i % 10)
             for i, state in enumerate(self.emot_states_area.keys())
         }
 
@@ -298,6 +311,8 @@ class EmotionSimulator:
         # plt.legend(loc="upper left")
         plt.grid(alpha=0.3)
         margin = 0.1
+        if self.emotion_range is None:
+            raise ValueError("emotion_range is not set")
         plt.xlim(self.emotion_range[0] - margin, self.emotion_range[1] + margin)
         plt.ylim(self.emotion_range[0] - margin, self.emotion_range[1] + margin)
         plt.show()

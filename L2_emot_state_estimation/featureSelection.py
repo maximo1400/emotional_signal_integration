@@ -289,8 +289,8 @@ class FeatureSelector:
             for band in self.sensor_info["frequency_bands"]:
                 pow = self.get_sensor_band_power(pow_data, sensor, band)
                 vals.append(pow)
-
-            entropy = self.calc_spectral_entropy(vals)
+            vals_arr = np.asarray(vals, dtype=float)
+            entropy = self.calc_spectral_entropy(vals_arr)
             entropies.append(entropy)
 
         return float(np.mean(entropies))

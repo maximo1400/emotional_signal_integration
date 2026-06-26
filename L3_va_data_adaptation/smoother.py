@@ -51,7 +51,7 @@ class DataSmoother:
             return self.last_v, self.last_a
 
         elif self.method == "steps":
-            if self.last_v is None:
+            if self.last_v is None or self.last_a is None:
                 self.last_v, self.last_a = v, a
 
             else:

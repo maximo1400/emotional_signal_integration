@@ -214,7 +214,7 @@ def predict_from_file(l1_queue: queue.Queue, l2_queue: queue.Queue):
 
 
 def predict_from_queue(
-    l1_queue: queue.Queue, l2_queue: queue.Queue, true_labels: list[str] = None
+    l1_queue: queue.Queue, l2_queue: queue.Queue, true_labels: list[str] | None = None
 ):
     config = get_config([
         "models_folder",
@@ -312,13 +312,15 @@ def predict_from_queue(
 
                 print(f"Saved evaluation report to {report_file}")
             else:
-                report = _evaluate_predictions(true_labels, predicted_labels)
+                report = _evaluate_predictions(
+                    true_labels, predicted_labels, output_dir="", save_png=False
+                )
             l2_queue.put(None)
 
 
-def run_l2(l1_queue: queue.Queue = None, l2_out_queue: queue.Queue = None):
+def run_l2(l1_queue: queue.Queue, l2_out_queue: queue.Queue):
     config = get_config(["classifier_mode"])
-    mode = config["classifier_mode"]
+    mode: str = config["classifier_mode"]
 
     if mode == "train":
         train_model()

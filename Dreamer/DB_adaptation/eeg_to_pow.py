@@ -192,7 +192,8 @@ def dreamer_to_bandpower(
 
     records = []
 
-    for (subj, trial), grp in df.groupby(group_cols, sort=False):
+    for name, grp in df.groupby(group_cols, sort=False):
+        subj, trial = name  # type: ignore
         # Extract EEG matrix (samples × 14 channels)
         eeg = grp[EEG_CHANNELS].values.astype(np.float32)
 
