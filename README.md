@@ -1,106 +1,83 @@
 # Emotional Signal Integration
 
-This repository provides a layered pipeline for extracting EEG band-power features (Layer 1), either simulate emotional-state data or capture from an EEG device. Preparing for downstream layers that will classify valence/arousal (Layer 2)(WIP) and broadcast results over sockets for integration with other software.
-
-## Quick overview
-- Purpose: capture or simulate band-power features, normalize valence/arousal, and stream L1 output for downstream processing.
-- Layers:
-	- L1 — Band-power capture & simulator (`L1_band_power_capture/`). Produces power vectors and an `output_df` when the simulator finishes.
-	- L2 (future) — VA classifier: consumes L1 vectors, produces `valence`, `arousal`, `label`, `confidence` and publishes over sockets.
-
-## Repo layout
-- `config.yml` — main configuration (data source, sequences, emotion ranges).
-- `main.py` — top-level orchestrator.
-- `requirements.txt` — Python dependencies.
-- `L1_band_power_capture/` — Layer 1 code (Emotiv connectors, simulator, data adapters):
-	- `Emotiv/` — live capture helpers and connectors.
-	- `Simulated_pow/` — `EmotionSimulator.py`, toy datasets in `Data/`.
-	- `DB_adaptation/` — converters between formats (MAT → feather, EEG → pow, etc.).
-- `output_data/` — output and exported artifacts.
-
-## What L1 produces
-- A stream (Python `queue.Queue`) of power vectors ordered by `POW_COLUMNS` (see `L1_band_power_capture/Simulated_pow/EmotionSimulator.py`).
-- When the simulator finishes (or on demand), `EmotionSimulator.output_df` contains rows with columns in this order:
-
-	power columns → `valence` → `arousal` → `emot_state` → `smoothed` → `timestamp`
-
-- `valence` and `arousal` are normalized to `emotion_range` from `config.yml`. `smoothed` is `True` if the values were blended during a transition between states.
+This repository provides a layered, end-to-end pipeline for capturing EEG band-power features, estimating emotional states (Valence/Arousal), and broadcasting the results over sockets for downstream integration (e.g., Unity, other applications). 
 
 ## How to run
 
-1) Install dependencies using `uv` (recommended) or `pip` as a fallback:
+1) Install dependencies using `uv` (recommended) or `pip`:
 ```bash
 uv sync
-# Or fallback:
-# pip install -r requirements.txt
 ```
-2) Configure `config.yml` as needed (e.g., choose `pow_data_source`, set sequences, etc.).
 
-3) If using the virtual simulator, or need to train a classifier, ensure you have the necessary data files in `Dreamer/Data`. 
-- Get access to the [Dreamer](https://zenodo.org/records/546113) 
- dataset and place the relevant `.mat` files in that directory.
-  ```bash
-  uv run python Dreamer/DB_adaptation/run_adaptation.py
-  ```
+2) Configure `config.yml` as needed (choose `pow_data_source`, classifier, socket config, etc.).
 
-4) If using the Emotiv device, ensure you have the necessary hardware set up and  add yor app credentials in `.env` file, it should look like:
+3) *Optional (For virtual simulator or training classifiers)*: Ensure you have the DREAMER dataset.
+- Place the relevant `.mat` files in `Dreamer/`.
+
+4) *Optional (For live Emotiv headset)*: Add your app credentials in `.env` file:
 ```.env
-APP_CLIENT_ID = "you_client_id"
-APP_CLIENT_SECRET = "your_client_secret"
+APP_CLIENT_ID="your_client_id"
+APP_CLIENT_SECRET="your_client_secret"
 ```
 
-
-5) Orchestrate via `main.py` using `uv` (recommended) or normal python as a fallback:
+5) Run the full pipeline via `main.py`:
 ```bash
-uv run python main.py
-# Or
-# python main.py
+uv run main.py
 ```
-You can overwrite any setting from `config.yml` by passing it as a command line flag using the standard `--key value` syntax. For example:
+You can overwrite most settings from `config.yml` by passing it as a command line flag using the standard `--key value` syntax. For example:
 ```bash
 uv run python main.py --verbose True --classifier_mode train
-# Or
-# python main.py --verbose True --classifier_mode train
 ```
-Not recommended for bigger changes, but useful for quick overrides.
 
-## Key `config.yml` settings (summary)
-- `pow_data_source`: `"virtual"` or `"emotiv"`.
-- `sub_id`: subject filter for virtual data; `-1` uses all subjects.
-- `transition_duration`: seconds to blend between states (0 = instant).
-- `sequences`: lists of `[state_id, duration_seconds]` pairs.
-- `emotion_range`: e.g. `[-1.0, 1.0]` used to normalize VA values.
-- `emotional_states_areas`: defines VA rectangles; rows outside these get state `NA`.
+## Key Configuration (`config.yml`)
+- `pow_data_source`: `"virtual"` or `"emotiv"`. (chooses between simulated DREAMER data or live Emotiv headset capture)
+- `classifier_mode`: `"train"`, `"predict_from_queue"`, or `"predict_from_file"`.
+- `classifier`: Model to use (e.g., `"knn"`, `"random_forest"`, `"svm"`, `"balanced_random_forest"`).
+- [`features_to_add` & `asymmetries`](L2_emot_state_estimation/features_documentation.md): Extracted EEG features used in classification.
+- `smoothing_method`: L3 smoothing strategy (`"rolling_buffer"`, `"ema"`, `"steps"`, `"none"`).
 
-## Output schema (per timestep row)
-- Power columns (floats) in order defined by `POW_COLUMNS`.
-- `valence` (float) — normalized to `emotion_range`.
-- `arousal` (float) — normalized to `emotion_range`.
-- `emot_state` (string) — state id assigned from `emotional_states_areas`.
-- `smoothed` (bool) — `True` if blended during a transition.
-- `timestamp` (float) — UNIX epoch seconds.
 
-## Layer 2 (classifier) and socket integration (design notes) (WIP)
-- L2 consumes L1 power vectors and outputs VA estimates. Consider:
-	- A lightweight scikit-learn model or a small neural net that uses a short temporal window.
-	- Output payload: `{source, sub_id, timestamp, valence, arousal, label, confidence}`.
+## Pipeline Architecture
+The pipeline is divided into three processing layers:
 
-- `L2_emot_state_estimation/run.py` can now train a fresh classifier from labeled Feather data when no `--model-path` is provided, and it saves the fitted model next to the prediction outputs by default.
-- To reuse an existing model, pass `--model-path /path/to/classifier.joblib`.
+### [Layer 1: Band Power Capture](L1_band_power_capture/README.md) (`L1_band_power_capture/`)
+Captures band-power features from an Emotiv EEG device or simulates data based on the DREAMER dataset. 
+- Produces power vectors and raw data frames.
+- Features include: Live streaming from Emotiv (`pow_data_source: emotiv`), Virtual sequence simulation (`pow_data_source: virtual`), and data adaptation.
 
-- Socket transport options being explored:
-	- TCP with newline-delimited JSON (simple, cross-language).
-	- WebSocket (if browser/HTTP clients required).
+### [Layer 2: Emotional State Estimation](L2_emot_state_estimation/README.md) (`L2_emot_state_estimation/`)
+Consumes L1 power vectors and outputs Valence/Arousal (VA) predictions, categorical emotion labels, and confidence metrics.
+- Uses machine learning classifiers (KNN, Random Forest, SVM) to predict states.
+- Supports extracting advanced features (e.g., Frontal Alpha Asymmetry, Spectral Entropy).
+- Capable of live predictions from queue or batch predictions from file.
+- Includes a training module to train a fresh classifier on the DREAMER dataset.
 
-- Example minimal JSON message:
+### [Layer 3: VA Data Adaptation & Output](L3_va_data_adaptation/README.md) (`L3_va_data_adaptation/`)
+Consumes L2 predictions, smooths the signals, and broadcasts the data.
+- **Smoothing Algorithms**: Moving average (rolling buffer), Exponential Moving Average (EMA), Step-based jumps.
+- **Socket Integration**: Broadcasts predictions over TCP or UDP for real-time external integration.
+- Outputs can also be saved to the `output_data/` directory.
+
+**_By default L3 expecets a listener to connect to it using TCP. You can change the host, port, and protocol in `config.yml` as needed or deactivate the listener if external one is used._**
+
+## Repository Layout
+- `config.yml` — Main configuration (data source, sequences, ML models, sockets).
+- `main.py` — Top-level orchestrator that connects the queues of all three layers.
+- `requirements.txt` / `pyproject.toml` — Python dependencies (managed via `uv`).
+- `config_loader.py` — Centralized configuration parsing.
+- `output_listener.py` — Standalone socket client for testing Layer 3 broadcasts.
+- `output_data/` — Directory for all exported artifacts and CSV outputs across layers, if `save_output_files` value is set in `config.yml`.
+- [`Dreamer/DB_adaptation/`](Dreamer/DB_adaptation/README.md) — Code to adapt the DREAMER dataset for virtual simulation and L2 model training.
+
+## Output Schema
+The L3 socket broadcasts a JSON payload for every timestep:
 ```json
 {
-	"source": "L2_classifier",
-	"sub_id": 4,
-	"timestamp": 1680000000.0,
-	"valence": 0.12,
-	"arousal": -0.45,
-	"label": "neutral",
-	"confidence": 0.78
+  "raw_valence": 0.12,
+  "raw_arousal": -0.45,
+  "smoothed_valence": 0.11,
+  "smoothed_arousal": -0.43,
+  "confidence": 0.78,
+  "timestamp": 1680000000.0
 }
 ```
