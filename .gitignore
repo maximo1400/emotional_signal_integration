@@ -206,9 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-
-torcheeg/
-.torcheeg/
 Dreamer/pow.feather
 Dreamer/DREAMER.mat
 Dreamer/pow_filtered.feather
@@ -216,5 +213,6 @@ Dreamer/pow_filtered.feather
 L1_band_power_capture/output_data/*
 L2_emot_state_estimation/output_data/*
 L3_va_data_adaptation/output_data/*
-
 L2_emot_state_estimation/Models/*
+
+output_data

@@ -18,7 +18,7 @@ save_output_files: False
 pow_data_source: virtual
 
 # Folder path to save the captured data. This is where the output from the L1 layer will be stored.
-L1_output_folder: L1_band_power_capture/output_data
+L1_output_folder: output_data/L1_band_power_capture
 
 ## Emotiv headset configuration
 # Emotiv streams, specify which streams to capture from the Emotiv dataset.
@@ -71,8 +71,8 @@ sequences:
 # Path to the .mat file containing the DREAMER raw data
 dreamer_mat_path: Dreamer/DREAMER.mat
 # Path to the feather file containing the pow data
-# feather_file_path: Dreamer/pow.feather
-feather_file_path: Dreamer/pow_filtered.feather
+feather_file_path: Dreamer/pow.feather
+# feather_file_path: Dreamer/pow_filtered.feather
 # Define the range of valence and arousal values for the emotional states.
 # Used to normalize the simulated emotional states.
 emotion_range: [-1.0, 1.0]
@@ -197,7 +197,7 @@ epoch_sensors:
 
 
 ## Layer 2: Data Processing Configuration
-l2_output_folder: L2_emot_state_estimation/output_data  # Folder path to save the processed data from Layer 2
+l2_output_folder: output_data/L2_emot_state_estimation  # Folder path to save the processed data from Layer 2
 
 ## Feature selection configuration for Layer 2
 # If it's needed, you can specify wich pow_column you wish to use for the classifier in layer 2. 
@@ -246,7 +246,7 @@ features_to_add: [
 
 # Classifier
 # Options: "random_forest", "svm", "knn", "balanced_random_forest"
-classifier: balanced_random_forest  # Classifier to use for emotion state estimation in Layer 2
+classifier: knn  # Classifier to use for emotion state estimation in Layer 2
 # Mode for the classifier. Options:
 # - "train": Train the classifier using the processed data from DREAMER.
 # - "predict_from_queue": Load a trained model from file and use it to make predictions on incoming data from L1 queue.
@@ -254,7 +254,7 @@ classifier: balanced_random_forest  # Classifier to use for emotion state estima
 classifier_mode: predict_from_queue
 # If classifier_mode is set to "predict_from_file", specify the 'pow' CSV file from L1 output to use for making predictions. 
 # This should be a path to a specific CSV file containing the power features extracted by L1.
-predict_from_file_pow_csv_path: L1_band_power_capture/output_data/virtual/pow.csv
+predict_from_file_pow_csv_path: output_data/L1_band_power_capture/virtual/pow.csv
 
 # Folder path to save the trained models from Layer 2. Each model will be saved with the corresponding name specified in models_names.
 models_folder: L2_emot_state_estimation/Models
@@ -306,15 +306,15 @@ class_balancing: none  # Class balancing method to use for training the classifi
 # Method to separate training and testing data. Options:
 # - "loso": Leave-One-Subject-Out cross validation, tests on one subject at a time. (slow)
 # - "group_kfold": Group K-Fold cross validation ensuring subjects are grouped into folds. (faster)
-data_split_method: loso
+data_split_method: group_kfold
 data_split_parameters:
   test_subjects: [4]  # List of IDs to ignore during training 
   group_kfold:
-    n_splits: 5
+    n_splits: 2
 
 
 ## Layer 3: Data Adaptation Configuration
-l3_output_folder: L3_va_data_adaptation/output_data
+l3_output_folder: output_data/L3_va_data_adaptation
 # Smoothing algorithm options: 
 # - rolling_buffer
 # - ema (Exponential Moving Average)

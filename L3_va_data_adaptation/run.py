@@ -26,6 +26,7 @@ def run_l3(l2_out_queue: queue.Queue):
         "socket_config",
         "verbose",
         "save_output_files",
+        "l3_output_folder",
     ])
     verbose = config["verbose"]
     method = config["smoothing_method"]
@@ -45,7 +46,7 @@ def run_l3(l2_out_queue: queue.Queue):
     output_dir = None
     output_file = None
     if save_files:
-        output_dir = Path(__file__).parent / "output_data"
+        output_dir = Path(config["l3_output_folder"])
         output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / f"out_{int(time.time())}.csv"
 

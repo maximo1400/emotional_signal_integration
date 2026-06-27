@@ -49,7 +49,7 @@ def _build_estimator(name: str, hyperparams: dict[str, Any]) -> ClassifierModel:
     # SVM needs CalibratedClassifierCV to enable confidence outputs
     if name == "svm":
         params.pop("probability", None)
-        base_estimator = CLASSIFIERS[name](**params)
+        base_estimator: ClassifierModel = CLASSIFIERS[name](**params)
         return CalibratedClassifierCV(base_estimator, ensemble=False)
 
     return CLASSIFIERS[name](**params)
@@ -253,8 +253,8 @@ class ClassifierManager:
                 y_train,
                 method=class_balancing,
             )
-            model = _build_estimator(name, hyperparams)
-            self.active_model = model
+            model: ClassifierModel = _build_estimator(name, hyperparams)
+            self.active_model: ClassifierModel = model
             model.fit(X_train_bal, y_train_bal)
 
             y_pred = self.batch_predict(X_test)
@@ -277,8 +277,8 @@ class ClassifierManager:
             y_final,
             method=class_balancing,
         )
-        final_model = _build_estimator(name, hyperparams)
-        self.active_model = final_model
+        final_model: ClassifierModel = _build_estimator(name, hyperparams)
+        self.active_model: ClassifierModel = final_model
         final_model.fit(X_full_bal, y_full_bal)
 
         if model_path:
