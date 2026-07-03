@@ -2,23 +2,20 @@ import numpy as np
 import pandas as pd
 import scipy.io as scio
 
-# fmt: off
-DREAMER_CHANNEL_LIST = ['AF3', 'F7', 'F3', 'FC5', 'T7', 'P7', 'O1', 'O2', 'P8', 'T8', 'FC6', 'F4', 'F8', 'AF4']
-# fmt: on
 
-
-def convert_mat_to_df(mat_path: str) -> pd.DataFrame:
+def convert_mat_to_df(mat_path: str, electrodes: list[str]) -> pd.DataFrame:
     """
     Reads DREAMER.mat and converts it to a DataFrame.
     """
     mat_data = scio.loadmat(mat_path, verify_compressed_data_integrity=False)
+    epoch_len = len(electrodes)
 
-    subject_len = len(mat_data["DREAMER"][0, 0]["Data"][0])
-    trial_len = len(
-        mat_data["DREAMER"][0, 0]["Data"][0, 0]["EEG"][0, 0]["stimuli"][0, 0]
-    )
+    # The MATLAB file structure is heavily nested. We extract the core 'Data' array here.
+    # mat_data["DREAMER"][0, 0]["Data"][0] contains an array of structs, one for each subject.
+    dreamer_data = mat_data["DREAMER"][0, 0]["Data"][0]
+    subject_len = len(dreamer_data)
 
-    df_columns = DREAMER_CHANNEL_LIST.copy()
+    df_columns = electrodes.copy()
     df_columns += [
         "start_at",
         "end_at",
@@ -35,22 +32,19 @@ def convert_mat_to_df(mat_path: str) -> pd.DataFrame:
     rows = []
 
     for subject in range(subject_len):
+        # Extract the specific subject's data struct
+        subject_data = dreamer_data[subject]
+        trial_len = len(subject_data["EEG"][0, 0]["stimuli"][0, 0])
+
         for trial_id in range(trial_len):
-            valence = mat_data["DREAMER"][0, 0]["Data"][0, subject]["ScoreValence"][
-                0, 0
-            ][trial_id, 0]
-            arousal = mat_data["DREAMER"][0, 0]["Data"][0, subject]["ScoreArousal"][
-                0, 0
-            ][trial_id, 0]
-            dominance = mat_data["DREAMER"][0, 0]["Data"][0, subject]["ScoreDominance"][
-                0, 0
-            ][trial_id, 0]
+            # Extract scores for the current trial
+            valence = subject_data["ScoreValence"][0, 0][trial_id, 0]
+            arousal = subject_data["ScoreArousal"][0, 0][trial_id, 0]
+            dominance = subject_data["ScoreDominance"][0, 0][trial_id, 0]
 
             # EEG data shape is (time_steps, 14)
-            trial_samples = mat_data["DREAMER"][0, 0]["Data"][0, subject]["EEG"][0, 0][
-                "stimuli"
-            ][0, 0][trial_id, 0]
-            trial_samples = trial_samples[:, :14]
+            trial_samples = subject_data["EEG"][0, 0]["stimuli"][0, 0][trial_id, 0]
+            trial_samples = trial_samples[:, :epoch_len]
 
             time_steps = trial_samples.shape[0]
 
@@ -76,7 +70,7 @@ def convert_mat_to_df(mat_path: str) -> pd.DataFrame:
     df = pd.DataFrame(all_data, columns=df_columns)
 
     # Ensure proper types
-    for col in DREAMER_CHANNEL_LIST:
+    for col in electrodes:
         df[col] = df[col].astype(float)
 
     df["start_at"] = df["start_at"].astype(int)

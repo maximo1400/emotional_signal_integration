@@ -149,6 +149,7 @@ def emotiv_bandpower(
 
 def dreamer_to_bandpower(
     df: pd.DataFrame,
+    electrodes: list[str],
     fs: int = 128,
     win_size: int = 256,
     hop: int = 16,
@@ -162,6 +163,8 @@ def dreamer_to_bandpower(
     ----------
     df : pd.DataFrame
         DREAMER dataset with EEG + metadata columns.
+    electrodes : list[str]
+        List of EEG channel names to process (must match DataFrame columns).
     fs : int
         Sampling rate (128 Hz for DREAMER/Emotiv).
     win_size : int
@@ -183,7 +186,7 @@ def dreamer_to_bandpower(
                  (plus frame_time if aggregate is None).
     """
     # Validate channels
-    missing = set(EEG_CHANNELS) - set(df.columns)
+    missing = set(electrodes) - set(df.columns)
     if missing:
         raise ValueError(f"Missing EEG channels: {missing}")
 
@@ -196,7 +199,7 @@ def dreamer_to_bandpower(
     for name, grp in df.groupby(group_cols, sort=False):
         subj, trial = name  # type: ignore
         # Extract EEG matrix (samples × 14 channels)
-        eeg = grp[EEG_CHANNELS].values.astype(np.float32)
+        eeg = grp[electrodes].values.astype(np.float32)
 
         # Skip if too short
         if eeg.shape[0] < win_size:
@@ -217,7 +220,7 @@ def dreamer_to_bandpower(
             for f_idx in range(bp.shape[0]):
                 row = {"subject_id": subj, "trial_id": trial, **meta}
                 row["frame_time"] = t[f_idx]
-                for ch_idx, ch in enumerate(EEG_CHANNELS):
+                for ch_idx, ch in enumerate(electrodes):
                     for b_idx, band in enumerate(band_names):
                         row[f"{ch}/{band}"] = bp[f_idx, ch_idx, b_idx]
                 records.append(row)
@@ -231,7 +234,7 @@ def dreamer_to_bandpower(
                 raise ValueError(f"Unknown aggregate: {aggregate}")
 
             row = {"subject_id": subj, "trial_id": trial, **meta}
-            for ch_idx, ch in enumerate(EEG_CHANNELS):
+            for ch_idx, ch in enumerate(electrodes):
                 for b_idx, band in enumerate(band_names):
                     row[f"{ch}/{band}"] = bp_agg[ch_idx, b_idx]
             records.append(row)
@@ -247,10 +250,12 @@ if __name__ == "__main__":
     df_raw = pd.read_feather("emotion_data/Dreamer/dreamer_eeg.feather")
 
     # # Option A: one row per trial (mean band power)
-    # df_bp = dreamer_to_bandpower(df_raw, aggregate="mean", output_db=True)
+    # df_bp = dreamer_to_bandpower(df_raw, EEG_CHANNELS, aggregate="mean", output_db=True)
     # print(df_bp.head())
     # df_bp.to_feather("emotion_data/Dreamer/dreamer_bandpower_trial.feather")
 
     # Option B: full spectrogram (one row per 0.125 s frame)
-    df_bp_full = dreamer_to_bandpower(df_raw, aggregate=None, output_db=True)
+    df_bp_full = dreamer_to_bandpower(
+        df_raw, EEG_CHANNELS, aggregate=None, output_db=True
+    )
     df_bp_full.to_feather("emotion_data/Dreamer/dreamer_bandpower_frames.feather")
