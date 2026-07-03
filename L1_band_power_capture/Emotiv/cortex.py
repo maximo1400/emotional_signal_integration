@@ -31,10 +31,10 @@ except ImportError:
     sys.exit(1)
 # --- END: Simplified environment checks ---
 
-import threading
-import ssl
-import time
 import json
+import ssl
+import threading
+import time
 from datetime import datetime
 
 # define request id

@@ -9,18 +9,17 @@ Modes:
 import os
 import queue
 import signal
+import sys
 import threading
 import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from L1_band_power_capture.Emotiv.Emotiv import Subcribe
 from L1_band_power_capture.EmotionSimulator import EmotionSimulator
+from L1_band_power_capture.Emotiv.Emotiv import Subcribe
 
 # Add parent directory to path to import config_loader
-import sys
-
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_loader import get_config
 
@@ -53,16 +52,14 @@ def _build_l1_output_path(base_folder: str, suffix: str) -> str:
 
 
 def run_l1(l1_out_queue: queue.Queue):
-    config = get_config(
-        [
-            "pow_data_source",
-            "L1_output_folder",
-            "emotiv_streams",
-            "profile_name",
-            "verbose",
-            "save_output_files",
-        ]
-    )
+    config = get_config([
+        "pow_data_source",
+        "L1_output_folder",
+        "emotiv_streams",
+        "profile_name",
+        "verbose",
+        "save_output_files",
+    ])
 
     if config["pow_data_source"] == "virtual":
         simulator = EmotionSimulator(l1_out_queue)

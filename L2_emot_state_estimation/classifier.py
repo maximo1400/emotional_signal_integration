@@ -10,19 +10,18 @@ Prediction API:
 - predict_with_confidence(...) -> {"label": str, "confidence": float | None}
 """
 
+import warnings
 from pathlib import Path
 from typing import Any, TypeAlias
 
 import joblib
 import numpy as np
-import warnings
+from imblearn.ensemble import BalancedRandomForestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GroupKFold, LeaveOneGroupOut, StratifiedGroupKFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.calibration import CalibratedClassifierCV
-from imblearn.ensemble import BalancedRandomForestClassifier
-
 
 ClassifierModel: TypeAlias = (
     KNeighborsClassifier

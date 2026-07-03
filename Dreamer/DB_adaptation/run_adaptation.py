@@ -1,18 +1,12 @@
 import sys
 from pathlib import Path
 
-# Add root directory to sys.path to resolve imports regardless of where script is executed
+from Dreamer.DB_adaptation.eeg_to_pow import dreamer_to_bandpower
+from Dreamer.DB_adaptation.mat_to_df import convert_mat_to_df
+
+# Add parent directory to path to import config_loader
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
-
-from config_loader import get_config  # noqa: E402
-
-from Dreamer.DB_adaptation.mat_to_df import (
-    convert_mat_to_df,
-)  # noqa: E402
-
-from Dreamer.DB_adaptation.eeg_to_pow import (
-    dreamer_to_bandpower,
-)  # noqa: E402
+from config_loader import get_config
 
 
 def run_data_adaptation():

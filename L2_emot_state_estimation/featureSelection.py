@@ -1,8 +1,9 @@
+import multiprocessing
 import sys
 from pathlib import Path
 from typing import Dict, List
+
 import numpy as np
-import multiprocessing
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))

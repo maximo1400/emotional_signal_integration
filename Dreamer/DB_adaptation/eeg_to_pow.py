@@ -1,7 +1,8 @@
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 from scipy.signal import lfilter
-from typing import Optional
 
 # fmt: off
 # Emotiv EPOC+ channel order

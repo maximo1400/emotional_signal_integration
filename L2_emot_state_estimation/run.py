@@ -8,14 +8,15 @@ Modes:
   predictions on incoming data from the L1 queue
 """
 
+import queue
 import sys
 import time
 from pathlib import Path
-import queue
+
 import pandas as pd
 
-from L2_emot_state_estimation.EpochNormalizer import EPOCCrossSessionNormalizer
 from L2_emot_state_estimation.classifier import ClassifierManager
+from L2_emot_state_estimation.EpochNormalizer import EPOCCrossSessionNormalizer
 from L2_emot_state_estimation.featureSelection import FeatureSelector
 from L2_emot_state_estimation.utils import (
     PredictionWriter,

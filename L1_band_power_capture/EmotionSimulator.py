@@ -1,12 +1,13 @@
-import time
-import pandas
-import pyarrow.feather as feather
 import queue
 import sys
+import time
 from pathlib import Path
-import matplotlib.pyplot as plt
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+import matplotlib.pyplot as plt
+import pandas
+import pyarrow.feather as feather
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_loader import get_config
 
 
@@ -38,19 +39,17 @@ class EmotionSimulator:
 
     def load_yml_config(self):
         """Parse config file and return the Python object it represents."""
-        config = get_config(
-            [
-                "feather_file_path",
-                "POW_COLUMNS",
-                "emotional_states_areas",
-                "sequences",
-                "sub_id",
-                "emotion_range",
-                "transition_duration",
-                "emotiv_pow_frec",
-                "verbose",
-            ]
-        )
+        config = get_config([
+            "feather_file_path",
+            "POW_COLUMNS",
+            "emotional_states_areas",
+            "sequences",
+            "sub_id",
+            "emotion_range",
+            "transition_duration",
+            "emotiv_pow_frec",
+            "verbose",
+        ])
 
         self.file_path = config["feather_file_path"]
         self.emotiv_columns = config["POW_COLUMNS"]
@@ -261,8 +260,7 @@ class EmotionSimulator:
         # Define colors for each state
         cmap = plt.get_cmap("tab10")
         state_colors = {
-            state: cmap(i % 10)
-            for i, state in enumerate(self.emot_states_area.keys())
+            state: cmap(i % 10) for i, state in enumerate(self.emot_states_area.keys())
         }
 
         for state, ranges in self.emot_states_area.items():
