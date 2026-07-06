@@ -199,6 +199,11 @@ epoch_sensors:
 ## Layer 2: Data Processing Configuration
 l2_output_folder: output_data/L2_emot_state_estimation  # Folder path to save the processed data from Layer 2
 
+# Normalization settings for Emotiv EPOC data
+enable_normalizer: True
+calibration_time: 45 # Time in seconds to calibrate the session baseline
+simple_calibration: False # If true, skips session calibration and just uses global baseline
+
 ## Feature selection configuration for Layer 2
 # If it's needed, you can specify wich pow_column you wish to use for the classifier in layer 2. 
 # (e.g., ["AF3/theta", "F7/alpha"])

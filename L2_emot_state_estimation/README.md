@@ -14,6 +14,7 @@ L2 consumes L1 power vectors and outputs Valence/Arousal predictions, categorica
 ## How It Works
 
 L2 relies heavily on the `config.yml` at the root of the project to determine its behavior:
+- **Normalization**: When processing data from an Emotiv EPOC headset and `enable_normalizer` is `True` in `config.yml`, the `EPOCCrossSessionNormalizer` is applied to incoming power vectors before feature extraction. It computes a global Z-score using `global_mu` and `global_sigma` from the config. If `simple_calibration` is `False`, it calibrates a session-specific baseline during the first `calibration_time` seconds of a session to remove cross-session offsets. If `simple_calibration` is `True`, it skips session calibration and uses the global baseline directly.
 - **Feature Extraction**: Extracts specific subsets of the `POW_COLUMNS` and computes additional features as defined by `features_to_add` and `asymmetries`.
 - **Classification**: Uses standard classifiers (KNN, Random Forest, SVM) trained to map these features to the Valence-Arousal space.
 - **Modes**:

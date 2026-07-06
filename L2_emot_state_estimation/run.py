@@ -29,6 +29,7 @@ from config_loader import get_config
 
 
 def _row_to_pow_values(row, pow_columns: list[str]) -> list[float]:
+    """Convert a row (dict, Series, or list) to a list of pow values in the order of pow_columns."""
     if isinstance(row, dict):
         row = row["pow"]
 
