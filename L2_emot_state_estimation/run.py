@@ -86,7 +86,7 @@ def _collect_training_data(
     arousal = _set_va_range(df["arousal"].tolist(), num_classes)
     labels = _va_to_label(valence, arousal)
     people = df["subject_id"].tolist()
-    normalizer = EPOCCrossSessionNormalizer(is_epoch_data=False)
+    normalizer = EPOCCrossSessionNormalizer()
     pow_vectors = _process_pow_vectors(df, pow_columns, normalizer)
     return pow_vectors, labels, people
 
@@ -255,8 +255,7 @@ def predict_from_queue(
 
     try:
         first_loop = True
-        is_epoch_data = config["pow_data_source"] == "emotiv"
-        normalizer = EPOCCrossSessionNormalizer(is_epoch_data=is_epoch_data)
+        normalizer = EPOCCrossSessionNormalizer()
 
         while True:
             row = l1_queue.get()
