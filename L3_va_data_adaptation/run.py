@@ -20,7 +20,7 @@ def parse_label(label_str: str) -> tuple[float, float]:
     return float(v), float(a)
 
 
-def run_l3(l2_out_queue: queue.Queue):
+def run_l3(l2_out_queue: queue.Queue, starting_timestamp: float = 0.0):
     config = get_config([
         "smoothing_method",
         "smoothing_parameters",
@@ -80,6 +80,7 @@ def run_l3(l2_out_queue: queue.Queue):
                 "smoothed_arousal",
                 "confidence",
                 "timestamp",
+                "starting_timestamp",
             ])
 
         while True:
@@ -93,24 +94,24 @@ def run_l3(l2_out_queue: queue.Queue):
             smooth_v, smooth_a = smoother.smooth(raw_v, raw_a)
 
             payload = {
-                "raw_valence": raw_v,
-                "raw_arousal": raw_a,
-                "smoothed_valence": smooth_v,
-                "smoothed_arousal": smooth_a,
+                "valence": smooth_v,
+                "arousal": smooth_a,
                 "confidence": data.get("confidence", 0.0),
                 "timestamp": data.get("timestamp", 0.0),
+                "starting_timestamp": starting_timestamp,
             }
 
             if save_files:
                 if writer is None or f is None:
                     raise ValueError("Writer not initialized")
                 writer.writerow([
-                    payload["raw_valence"],
-                    payload["raw_arousal"],
-                    payload["smoothed_valence"],
-                    payload["smoothed_arousal"],
+                    raw_v,
+                    raw_a,
+                    payload["valence"],
+                    payload["arousal"],
                     payload["confidence"],
                     payload["timestamp"],
+                    payload["starting_timestamp"],
                 ])
                 f.flush()
 

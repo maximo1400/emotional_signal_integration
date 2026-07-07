@@ -23,10 +23,8 @@ L3 acts as a server that broadcasts the final prediction payloads as newline-del
 Example payload sent over the socket:
 ```json
 {
-  "raw_valence": 0.12,
-  "raw_arousal": -0.45,
-  "smoothed_valence": 0.11,
-  "smoothed_arousal": -0.43,
+  "valence": 0.11,
+  "arousal": -0.43,
   "confidence": 0.78,
   "timestamp": 1680000000.0
 }

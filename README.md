@@ -73,10 +73,8 @@ Consumes L2 predictions, smooths the signals, and broadcasts the data.
 The L3 socket broadcasts a JSON payload for every timestep:
 ```json
 {
-  "raw_valence": 0.12,
-  "raw_arousal": -0.45,
-  "smoothed_valence": 0.11,
-  "smoothed_arousal": -0.43,
+  "valence": 0.11,
+  "arousal": -0.43,
   "confidence": 0.78,
   "timestamp": 1680000000.0
 }

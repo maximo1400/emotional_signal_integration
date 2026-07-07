@@ -21,7 +21,8 @@ def main() -> None:
         "feather_file_path",
         "pow_data_source",
     ])
-    print(f"Starting on timestamp: {time.time()}")
+    starting_timestamp = time.time()
+    print(f"Starting on timestamp: {starting_timestamp}")
     classif_mode = config["classifier_mode"]
     listen_out = config["start_socket_listener"]
     pow_file_path = config["feather_file_path"]
@@ -42,7 +43,7 @@ def main() -> None:
             l3_listener_thread = threading.Thread(target=run_l3_listener, daemon=True)
             l3_listener_thread.start()
 
-        l3_thread = threading.Thread(target=run_l3, args=(l2_out,), daemon=True)
+        l3_thread = threading.Thread(target=run_l3, args=(l2_out, starting_timestamp), daemon=True)
         l3_thread.start()
 
         l2_thread = threading.Thread(target=run_l2, args=(l1_out, l2_out), daemon=True)
