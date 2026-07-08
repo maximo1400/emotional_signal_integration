@@ -368,7 +368,7 @@ class Subcribe:
         local_time = time.time()
         pow_data = data["pow"] + [local_time]
         self.data["pow"].loc[len(self.data["pow"])] = pow_data
-        payload["pow"] = pow_data
+        payload["pow"] = data["pow"]
         payload["timestamp"] = local_time
         self.queue.put(payload)
         mean_pow = sum(data["pow"]) / len(data["pow"])
@@ -382,7 +382,7 @@ class Subcribe:
         if not isinstance(data, dict):
             return
 
-        com_data = list(data.values()) + [time.time()]
+        com_data = [data["action"], data["power"], time.time()]
         self.data["com"].loc[len(self.data["com"])] = com_data
         if self.verbose:
             print("com data: {}".format(data))
@@ -392,7 +392,7 @@ class Subcribe:
         if not isinstance(data, dict):
             return
 
-        fe_data = list(data.values()) + [time.time()]
+        fe_data = [data["eyeAct"], data["uAct"], data["uPow"], data["lAct"], data["lPow"], time.time()]
         self.data["fac"].loc[len(self.data["fac"])] = fe_data
         if self.verbose:
             print("fe data: {}".format(data))
