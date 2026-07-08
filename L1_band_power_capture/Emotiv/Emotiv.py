@@ -1,4 +1,5 @@
 import queue
+import time
 
 import pandas as pd
 
@@ -40,9 +41,11 @@ class Subcribe:
         self,
         app_client_id,
         app_client_secret,
-        verbose=True,
+        verbose: bool,
+        starting_timestamp: float,
         **kwargs,
     ):
+        self.starting_timestamp = starting_timestamp
         self.c = Cortex(app_client_id, app_client_secret, debug_mode=verbose, **kwargs)
         self.c.bind(create_session_done=self.on_create_session_done)
         self.c.bind(new_data_labels=self.on_new_data_labels)
@@ -218,7 +221,10 @@ class Subcribe:
         stream_name = data["streamName"]
         stream_labels = data["labels"]
         if stream_name in ["eeg", "com", "fac", "mot", "met", "pow", "sys", "dev"]:
-            stream_labels += ["timestamp"]
+            stream_labels += [
+                "starting_timestamp",
+                "current_timestamp",
+            ]
         if self.verbose:
             print("**New Dataset**")
         if stream_name != "eeg":
@@ -284,8 +290,8 @@ class Subcribe:
         data = kwargs.get("data")
         if not isinstance(data, dict):
             return
-        timestamp = data["time"]
-        eeg_data = data["eeg"] + [timestamp]
+
+        eeg_data = data["eeg"] + [self.starting_timestamp, time.time()]
         # self.data["eeg"].loc[len(self.data["eeg"])] = eeg_data
         self.data["eeg"].append(eeg_data)
         if self.verbose:
@@ -304,8 +310,8 @@ class Subcribe:
         data = kwargs.get("data")
         if not isinstance(data, dict):
             return
-        timestamp = data["time"]
-        mot_data = data["mot"] + [timestamp]
+
+        mot_data = data["mot"] + [self.starting_timestamp, time.time()]
         self.data["mot"].loc[len(self.data["mot"])] = mot_data
         if self.verbose:
             print("motion data: {}".format(data))
@@ -322,8 +328,8 @@ class Subcribe:
         """
         data = kwargs.get("data")
         assert isinstance(data, dict)
-        timestamp = data["time"]
-        dev_data = data["dev"] + [timestamp]
+
+        dev_data = data["dev"] + [self.starting_timestamp, time.time()]
         self.data["dev"].loc[len(self.data["dev"])] = dev_data
         if self.verbose:
             print("dev data: {}".format(data))
@@ -340,8 +346,8 @@ class Subcribe:
         """
         data = kwargs.get("data")
         assert isinstance(data, dict)
-        timestamp = data["time"]
-        met_data = data["met"] + [timestamp]
+
+        met_data = data["met"] + [self.starting_timestamp, time.time()]
         self.data["met"].loc[len(self.data["met"])] = met_data
         if self.verbose:
             print("pm data: {}".format(data))
@@ -358,10 +364,14 @@ class Subcribe:
         """
         data = kwargs.get("data")
         assert isinstance(data, dict)
-        timestamp = data["time"]
-        pow_data = data["pow"] + [timestamp]
+        payload = {}
+
+        local_time = time.time()
+        pow_data = data["pow"] + [self.starting_timestamp, local_time]
         self.data["pow"].loc[len(self.data["pow"])] = pow_data
-        self.queue.put(data)
+        payload["pow"] = pow_data
+        payload["current_timestamp"] = local_time
+        self.queue.put(payload)
         mean_pow = sum(data["pow"]) / len(data["pow"])
 
         if self.verbose:
@@ -372,7 +382,11 @@ class Subcribe:
         data = kwargs.get("data")
         if not isinstance(data, dict):
             return
-        com_data = list(data.values())
+
+        com_data = list(data.values()) + [
+            self.starting_timestamp,
+            time.time(),
+        ]
         self.data["com"].loc[len(self.data["com"])] = com_data
         if self.verbose:
             print("com data: {}".format(data))
@@ -381,7 +395,8 @@ class Subcribe:
         data = kwargs.get("data")
         if not isinstance(data, dict):
             return
-        fe_data = list(data.values())
+
+        fe_data = list(data.values()) + [self.starting_timestamp, time.time()]
         self.data["fac"].loc[len(self.data["fac"])] = fe_data
         if self.verbose:
             print("fe data: {}".format(data))

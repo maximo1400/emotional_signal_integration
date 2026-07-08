@@ -20,7 +20,7 @@ def parse_label(label_str: str) -> tuple[float, float]:
     return float(v), float(a)
 
 
-def run_l3(l2_out_queue: queue.Queue, starting_timestamp: float = 0.0):
+def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
     config = get_config([
         "smoothing_method",
         "smoothing_parameters",
@@ -28,6 +28,8 @@ def run_l3(l2_out_queue: queue.Queue, starting_timestamp: float = 0.0):
         "verbose",
         "save_output_files",
         "l3_output_folder",
+        "pow_data_source",
+        "classifier_mode",
     ])
     verbose = config["verbose"]
     method = config["smoothing_method"]
@@ -44,12 +46,7 @@ def run_l3(l2_out_queue: queue.Queue, starting_timestamp: float = 0.0):
             f"L3 starting with {method} smoothing. Socket on {host}:{port} ({protocol})"
         )
 
-    output_dir = None
     output_file = None
-    if save_files:
-        output_dir = Path(config["l3_output_folder"])
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / f"out_{int(time.time())}.csv"
 
     # Setup socket
     if protocol == "tcp":
@@ -68,20 +65,7 @@ def run_l3(l2_out_queue: queue.Queue, starting_timestamp: float = 0.0):
     try:
         f = None
         writer = None
-        if save_files:
-            if output_file is None:
-                raise ValueError("output_file not set")
-            f = output_file.open("w", newline="", encoding="utf-8")
-            writer = csv.writer(f)
-            writer.writerow([
-                "raw_valence",
-                "raw_arousal",
-                "smoothed_valence",
-                "smoothed_arousal",
-                "confidence",
-                "timestamp",
-                "starting_timestamp",
-            ])
+        first_loop = True
 
         while True:
             data = l2_out_queue.get()
@@ -93,12 +77,34 @@ def run_l3(l2_out_queue: queue.Queue, starting_timestamp: float = 0.0):
             raw_v, raw_a = parse_label(str(data["label"]))
             smooth_v, smooth_a = smoother.smooth(raw_v, raw_a)
 
+            current_timestamp = time.time()
+            prev_layer_timestamp = data["timestamp"]
+
+            if first_loop and save_files:
+                ts_int = int(start_timestamp)
+                output_file = Path(config["l3_output_folder"]) / f"out_{ts_int}.csv"
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+                f = output_file.open("w", newline="", encoding="utf-8")
+                writer = csv.writer(f)
+                writer.writerow([
+                    "raw_valence",
+                    "raw_arousal",
+                    "smoothed_valence",
+                    "smoothed_arousal",
+                    "confidence",
+                    "starting_timestamp",
+                    "current_timestamp",
+                    "previous_layer_timestamp",
+                    "smoothing_method",
+                ])
+                first_loop = False
+
             payload = {
                 "valence": smooth_v,
                 "arousal": smooth_a,
-                "confidence": data.get("confidence", 0.0),
-                "timestamp": data.get("timestamp", 0.0),
-                "starting_timestamp": starting_timestamp,
+                "confidence": data["confidence"],
+                "starting_timestamp": start_timestamp,
+                "current_timestamp": current_timestamp,
             }
 
             if save_files:
@@ -110,8 +116,10 @@ def run_l3(l2_out_queue: queue.Queue, starting_timestamp: float = 0.0):
                     payload["valence"],
                     payload["arousal"],
                     payload["confidence"],
-                    payload["timestamp"],
                     payload["starting_timestamp"],
+                    payload["current_timestamp"],
+                    prev_layer_timestamp,
+                    config["smoothing_method"],
                 ])
                 f.flush()
 

@@ -28,17 +28,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_loader import get_config
 
 
-def _row_to_pow_values(row, pow_columns: list[str]) -> list[float]:
-    """Convert a row (dict, Series, or list) to a list of pow values in the order of pow_columns."""
-    if isinstance(row, dict):
-        row = row["pow"]
-
-    if isinstance(row, pd.Series):
-        return row.reindex(pow_columns).tolist()
-
-    return list(row)
-
-
 def _set_va_range(values: list[int], num_classes: int) -> list[int]:
     """Compress DREAMER 1..5 valence/arousal values into 0..num_classes-1."""
     if num_classes == 1:
@@ -91,20 +80,7 @@ def _collect_training_data(
     return pow_vectors, labels, people
 
 
-def _build_output_file(
-    output_csv_folder: str | Path,
-    pow_data_source: str,
-    filename: str = "predictions.csv",
-    create_dir: bool = True,
-) -> Path:
-    run_stamp = str(int(time.time()))
-    output_folder = Path(output_csv_folder) / f"{pow_data_source}_{run_stamp}"
-    if create_dir:
-        output_folder.mkdir(parents=True, exist_ok=True)
-    return output_folder / filename
-
-
-def train_model():
+def train_model(starting_timestamp: float):
     config = get_config([
         "feather_file_path",
         "POW_COLUMNS",
@@ -153,14 +129,17 @@ def train_model():
     true_labels = [str(label) for label in train_result["y_test"]]
     predicted_labels = [str(label) for label in train_result["y_pred"]]
 
-    output_file = _build_output_file(
-        config["l2_output_folder"],
-        "train",
-        filename="test_predictions.csv",
-    )
+    ds = config["pow_data_source"]
+    st_ts = int(starting_timestamp)
+    output_file = Path(config["l2_output_folder"]) / f"out_{st_ts}.csv"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
 
     eval_data = _evaluate_predictions(
-        true_labels, predicted_labels, output_dir=output_file.parent, save_png=True
+        true_labels,
+        predicted_labels,
+        output_dir=output_file.parent,
+        save_png=True,
+        prefix=f"L2_{st_ts}_{ds}_train_{classifier}_",
     )
 
     output_frame = pd.DataFrame({
@@ -172,16 +151,21 @@ def train_model():
         "pred_arousal": eval_data["pred_arousal"],
     })
 
+    output_frame["classifier_mode"] = "train"
     output_frame.to_csv(output_file, index=False)
 
-    report_file = output_file.with_name("evaluation.txt")
+    report_file = output_file.with_name(
+        f"L2_{st_ts}_{ds}_train_{classifier}_evaluation.txt"
+    )
     report_file.write_text("\n".join(eval_data["formatted_report"]), encoding="utf-8")
 
     print(f"Saved train/test comparison to {output_file}")
     print(f"Saved evaluation report to {report_file}")
 
 
-def predict_from_file(l1_queue: queue.Queue, l2_queue: queue.Queue):
+def predict_from_file(
+    l1_queue: queue.Queue, l2_queue: queue.Queue, starting_timestamp: float
+):
     config = get_config([
         "POW_COLUMNS",
         "num_classes",
@@ -204,34 +188,41 @@ def predict_from_file(l1_queue: queue.Queue, l2_queue: queue.Queue):
         true_arousals = _set_va_range(df["arousal"].tolist(), num_classes)
         true_labels = _va_to_label(true_valences, true_arousals)
 
-    df_pow = df.reindex(columns=config["POW_COLUMNS"])
-    for row in df_pow.itertuples(index=False, name=None):
-        l1_queue.put(list(row))
+    # df_pow = df.reindex(columns=config["POW_COLUMNS"])
+    for idx, row in df.iterrows():
+        pow_vals = [row[col] for col in config["POW_COLUMNS"]]
+        q_row = {
+            "pow": pow_vals,
+            "current_timestamp": row["current_timestamp"],
+        }
+        l1_queue.put(q_row)
     l1_queue.put(None)
 
     print(
         "Finished sending pow vectors to L1 queue, now will run L2 in predict_from_queue mode"
     )
-    predict_from_queue(l1_queue, l2_queue, true_labels=true_labels)
+    predict_from_queue(l1_queue, l2_queue, starting_timestamp, true_labels=true_labels)
 
 
 def predict_from_queue(
-    l1_queue: queue.Queue, l2_queue: queue.Queue, true_labels: list[str] | None = None
+    l1_queue: queue.Queue,
+    l2_queue: queue.Queue,
+    start_timestamp: float,
+    true_labels: list[str] | None = None,
 ):
     config = get_config([
         "models_folder",
         "classifier",
-        "POW_COLUMNS",
         "num_classes",
         "models_names",
         "l2_output_folder",
         "pow_data_source",
         "verbose",
         "save_output_files",
+        "classifier_mode",
     ])
     verbose = config["verbose"]
     classifier = config["classifier"]
-    pow_columns = config["POW_COLUMNS"]
     save_files = config["save_output_files"]
     num_classes = config["num_classes"]
 
@@ -243,13 +234,7 @@ def predict_from_queue(
 
     feat_select = FeatureSelector()
 
-    output_file = _build_output_file(
-        config["l2_output_folder"],
-        config["pow_data_source"],
-        filename="queue_predictions.csv",
-        create_dir=save_files,
-    )
-
+    output_file = Path(config["l2_output_folder"]) / f"out_{int(start_timestamp)}.csv"
     pred_writer = PredictionWriter(output_file, save_files, true_labels)
     predicted_labels = []
 
@@ -266,7 +251,9 @@ def predict_from_queue(
                 l2_queue.put(None)  # Signal to L3 that predictions are done
                 break
 
-            pow_values = _row_to_pow_values(row, pow_columns)
+            pow_values: list = row["pow"]
+            prev_layer_timestamp: float = row["current_timestamp"]
+
             normalized_values = normalizer.new_row(pow_values)
             pow_row = feat_select.process_data(normalized_values)
 
@@ -279,16 +266,25 @@ def predict_from_queue(
             prediction = classifier_manager.predict_with_confidence(pow_row)
             prediction_label = prediction["label"]
             prediction_conf = prediction["confidence"]
-            timestamp = time.time()
+            local_timestamp = time.time()
 
             predicted_labels.append(str(prediction["label"]))
 
-            pred_writer.write_row(pow_row, prediction_label, prediction_conf, timestamp)
+            pred_writer.write_row(
+                pow_row,
+                prediction_label,
+                prediction_conf,
+                start_timestamp,
+                local_timestamp,
+                prev_layer_timestamp,
+                config.get("classifier_mode", "unknown"),
+            )
 
             payload = {
                 "label": prediction_label,
                 "confidence": prediction_conf,
-                "timestamp": timestamp,
+                "timestamp": local_timestamp,
+                "starting_timestamp": start_timestamp,
             }
             l2_queue.put(payload)
             print(f"Classifier output: {payload}")
@@ -300,32 +296,34 @@ def predict_from_queue(
         if true_labels is not None and len(true_labels) == len(predicted_labels):
             print("\nEvaluating Virtual File Predictions:")
             if save_files:
+                eval_prefix = output_file.stem + "_"
                 report = _evaluate_predictions(
                     true_labels,
                     predicted_labels,
                     output_dir=output_file.parent,
                     save_png=save_files,
+                    prefix=eval_prefix,
                 )
-                report_file = output_file.with_name("evaluation.txt")
+                report_file = output_file.with_name(eval_prefix + "evaluation.txt")
                 report_file.write_text(
                     "\n".join(report["formatted_report"]), encoding="utf-8"
                 )
 
                 print(f"Saved evaluation report to {report_file}")
             else:
-                report = _evaluate_predictions(
+                _evaluate_predictions(
                     true_labels, predicted_labels, output_dir="", save_png=False
                 )
             l2_queue.put(None)
 
 
-def run_l2(l1_queue: queue.Queue, l2_out_queue: queue.Queue):
+def run_l2(l1_queue: queue.Queue, l2_queue: queue.Queue, starting_timestamp: float):
     config = get_config(["classifier_mode"])
     mode: str = config["classifier_mode"]
 
     if mode == "train":
-        train_model()
+        train_model(starting_timestamp)
     elif mode == "predict_from_file":
-        predict_from_file(l1_queue, l2_out_queue)
+        predict_from_file(l1_queue, l2_queue, starting_timestamp)
     elif mode == "predict_from_queue":
-        predict_from_queue(l1_queue, l2_out_queue)
+        predict_from_queue(l1_queue, l2_queue, starting_timestamp)

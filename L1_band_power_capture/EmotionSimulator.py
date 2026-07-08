@@ -29,7 +29,8 @@ class EmotionSimulator:
     pow_read = {}
     transition_duration = 0
 
-    def __init__(self, queue: queue.Queue):
+    def __init__(self, queue: queue.Queue, starting_timestamp: float):
+        self.starting_timestamp = starting_timestamp
         self.out_queue = queue
         self.load_yml_config()
         self.load_pow_data()
@@ -218,8 +219,11 @@ class EmotionSimulator:
                     ]
                     smoothed = True
 
-                self.update_queue(pow_data)
-                self.update_output_rows(pow_data, state, valence, arousal, smoothed)
+                t_cur = time.time()
+                self.update_queue(pow_data, t_cur)
+                self.update_output_rows(
+                    pow_data, state, valence, arousal, smoothed, t_cur
+                )
                 self.pow_read[state] += 1
                 if self.pow_read[state] >= self.pow_by_state[state].shape[0]:
                     self.pow_read[state] = 0
@@ -227,18 +231,31 @@ class EmotionSimulator:
                 if self.data_frec is None:
                     raise ValueError("data_frec is not set")
                 time.sleep(1 / self.data_frec)
-                t_cur = time.time()
 
-    def update_queue(self, pow) -> None:
+    def update_queue(
+        self,
+        pow,
+        t_cur,
+    ) -> None:
         "adds the new pow data to the output queue"
         if self.out_queue is None:
             raise ValueError("Queue not initialized")
-        self.out_queue.put(pow)
-        print(f"new data put in queue, mean: {sum(pow) / len(pow):.4f}")
+        self.out_queue.put({
+            "pow": pow,
+            "current_timestamp": t_cur,
+        })
+        print(f"new data put in L1 queue, mean: {sum(pow) / len(pow):.4f}")
 
-    def update_output_rows(self, pow, emot_state, valence, arousal, smoothed):
+    def update_output_rows(self, pow, emot_state, valence, arousal, smoothed, t_cur):
         "adds a new row to the output with the pow data, emotional state, valence, arousal, smoothed flag and timestamp"
-        new_row = pow + [valence, arousal, emot_state, smoothed, time.time()]
+        new_row = pow + [
+            valence,
+            arousal,
+            emot_state,
+            smoothed,
+            self.starting_timestamp,
+            t_cur,
+        ]
         self.output_rows.append(new_row)
 
     def finalize_output_df(self):
@@ -248,7 +265,8 @@ class EmotionSimulator:
             "arousal",
             "emot_state",
             "smoothed",
-            "timestamp",
+            "starting_timestamp",
+            "current_timestamp",
         ]
         self.output_df = pandas.DataFrame(self.output_rows, columns=columns)
 
@@ -314,14 +332,3 @@ class EmotionSimulator:
         plt.xlim(self.emotion_range[0] - margin, self.emotion_range[1] + margin)
         plt.ylim(self.emotion_range[0] - margin, self.emotion_range[1] + margin)
         plt.show()
-
-
-def main():
-    out = queue.Queue()
-    simulator = EmotionSimulator(out)
-    # simulator.plot_emotion_distribution()
-    simulator.main_loop()
-
-
-if __name__ == "__main__":
-    main()

@@ -39,19 +39,7 @@ def _monitor_stop(emotiv, stop_event: threading.Event, l1_out_queue: queue.Queue
     emotiv.c.close()
 
 
-def _build_l1_output_path(base_folder: str, suffix: str) -> str:
-    if not os.path.exists(base_folder):
-        os.makedirs(base_folder, exist_ok=True)
-
-    output_path = f"{base_folder}/{suffix}"
-    if os.path.exists(output_path):
-        output_path = output_path + "_" + str(int(time.time()))
-
-    os.makedirs(output_path, exist_ok=True)
-    return output_path
-
-
-def run_l1(l1_out_queue: queue.Queue):
+def run_l1(l1_out_queue: queue.Queue, starting_timestamp: float):
     config = get_config([
         "pow_data_source",
         "L1_output_folder",
@@ -62,17 +50,18 @@ def run_l1(l1_out_queue: queue.Queue):
     ])
 
     if config["pow_data_source"] == "virtual":
-        simulator = EmotionSimulator(l1_out_queue)
+        simulator = EmotionSimulator(l1_out_queue, starting_timestamp)
         simulator.main_loop()
 
         if config["save_output_files"]:
-            output_path = _build_l1_output_path(
-                config["L1_output_folder"],
-                config["pow_data_source"],
-            )
+            ds = config["pow_data_source"]
+            st_ts = int(simulator.starting_timestamp)
+            output_file = Path(config["L1_output_folder"]) / f"out_{st_ts}.csv"
+            output_file.parent.mkdir(parents=True, exist_ok=True)
             if simulator.output_df is None:
                 raise ValueError("output_df not generated")
-            simulator.output_df.to_csv(f"{output_path}/pow.csv")
+            simulator.output_df["data_origin"] = ds
+            simulator.output_df.to_csv(output_file, index=False)
         return
 
     # Emotiv data source logic
@@ -88,7 +77,7 @@ def run_l1(l1_out_queue: queue.Queue):
         emotiv_client_id,
         emotiv_client_secret,
         verbose=config["verbose"],
-        emotiv_profile=profile_name,
+        starting_timestamp=starting_timestamp,
     )
 
     monitor_thread = threading.Thread(
@@ -111,6 +100,11 @@ def run_l1(l1_out_queue: queue.Queue):
     print(f"Tiempo de Aplicacion: {int(((t1 - t0) / 60) * 100) / 100} min")
 
     if config["save_output_files"]:
-        output_path = _build_l1_output_path(config["L1_output_folder"], profile_name)
+        ds = config["pow_data_source"]
+        st_ts = int(emotiv.starting_timestamp)
+        output_dir = Path(config["L1_output_folder"]) / f"out_{st_ts}"
+        output_dir.mkdir(parents=True, exist_ok=True)
         for stream in emotiv.data:
-            emotiv.data[stream].to_csv(f"{output_path}/{stream}.csv")
+            data_to_save = emotiv.data[stream]
+            data_to_save["data_origin"] = ds
+            data_to_save.to_csv(output_dir / f"{stream}.csv", index=False)

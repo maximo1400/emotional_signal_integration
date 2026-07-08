@@ -102,13 +102,21 @@ class PredictionWriter:
         self.writer = None
 
         if self.save_files:
+            output_file.parent.mkdir(parents=True, exist_ok=True)
             self.f = output_file.open("w", newline="", encoding="utf-8")
             self.writer = csv.writer(self.f)
 
     def write_headers(self, feature_names: list[str]):
         if not self.save_files or self.writer is None:
             return
-        headers = [*feature_names, "y_pred", "confidence", "timestamp"]
+        headers = feature_names + [
+            "predicted_label",
+            "confidence",
+            "starting_timestamp",
+            "current_timestamp",
+            "previous_layer_timestamp",
+            "classifier_mode",
+        ]
         if self.true_labels is not None:
             headers.append("y_true")
         self.writer.writerow(headers)
@@ -118,13 +126,24 @@ class PredictionWriter:
         pow_vector: list[float],
         prediction_label: str,
         prediction_confidence: float,
-        timestamp: float,
+        starting_timestamp: float,
+        current_timestamp: float,
+        previous_layer_timestamp: float,
+        classifier_mode: str,
     ):
         if not self.save_files or self.writer is None or self.f is None:
             self.predicted_count += 1
             return
 
-        row = [*pow_vector, prediction_label, prediction_confidence, timestamp]
+        row = [
+            *pow_vector,
+            prediction_label,
+            prediction_confidence,
+            starting_timestamp,
+            current_timestamp,
+            previous_layer_timestamp,
+            classifier_mode,
+        ]
         if self.true_labels is not None:
             row.append(self.true_labels[self.predicted_count])
         self.writer.writerow(row)
@@ -153,6 +172,7 @@ def _evaluate_predictions(
     pred_y: list[str],
     output_dir: Path | str,
     save_png: bool = True,
+    prefix: str = "",
 ) -> dict[str, list[str]]:
     true_val, true_ar = _split_va_labels(true_y)
     pred_val, pred_ar = _split_va_labels(pred_y)
@@ -182,7 +202,7 @@ def _evaluate_predictions(
     print("Joint accuracy:", joint_acc)
     print("classification_report:\n", class_report)
 
-    png_path = Path(output_dir) / "confusion_matrix.png"
+    png_path = Path(output_dir) / f"{prefix}confusion_matrix.png"
     plot_confusion_matrix(true_y, pred_y, save_png=save_png, png_path=str(png_path))
 
     formatted_report = [
