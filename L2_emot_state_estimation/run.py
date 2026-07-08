@@ -129,7 +129,6 @@ def train_model(starting_timestamp: float):
     true_labels = [str(label) for label in train_result["y_test"]]
     predicted_labels = [str(label) for label in train_result["y_pred"]]
 
-    ds = config["pow_data_source"]
     st_ts = int(starting_timestamp)
     output_file = Path(config["l2_output_folder"]) / f"out_{st_ts}.csv"
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -139,7 +138,7 @@ def train_model(starting_timestamp: float):
         predicted_labels,
         output_dir=output_file.parent,
         save_png=True,
-        prefix=f"L2_{st_ts}_{ds}_train_{classifier}_",
+        prefix=f"L2_{st_ts}_train_{classifier}_",
     )
 
     output_frame = pd.DataFrame({
@@ -154,9 +153,7 @@ def train_model(starting_timestamp: float):
     output_frame["classifier_mode"] = "train"
     output_frame.to_csv(output_file, index=False)
 
-    report_file = output_file.with_name(
-        f"L2_{st_ts}_{ds}_train_{classifier}_evaluation.txt"
-    )
+    report_file = output_file.with_name(f"L2_{st_ts}_train_{classifier}_evaluation.txt")
     report_file.write_text("\n".join(eval_data["formatted_report"]), encoding="utf-8")
 
     print(f"Saved train/test comparison to {output_file}")
