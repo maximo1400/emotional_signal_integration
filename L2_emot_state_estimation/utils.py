@@ -112,8 +112,7 @@ class PredictionWriter:
         headers = feature_names + [
             "predicted_label",
             "confidence",
-            "starting_timestamp",
-            "current_timestamp",
+            "timestamp",
             "previous_layer_timestamp",
             "classifier_mode",
         ]
@@ -126,8 +125,7 @@ class PredictionWriter:
         pow_vector: list[float],
         prediction_label: str,
         prediction_confidence: float,
-        starting_timestamp: float,
-        current_timestamp: float,
+        timestamp: float,
         previous_layer_timestamp: float,
         classifier_mode: str,
     ):
@@ -139,8 +137,7 @@ class PredictionWriter:
             *pow_vector,
             prediction_label,
             prediction_confidence,
-            starting_timestamp,
-            current_timestamp,
+            timestamp,
             previous_layer_timestamp,
             classifier_mode,
         ]

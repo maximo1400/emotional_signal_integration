@@ -77,7 +77,7 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
             raw_v, raw_a = parse_label(str(data["label"]))
             smooth_v, smooth_a = smoother.smooth(raw_v, raw_a)
 
-            current_timestamp = time.time()
+            timestamp = time.time()
             prev_layer_timestamp = data["timestamp"]
 
             if first_loop and save_files:
@@ -92,8 +92,7 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
                     "smoothed_valence",
                     "smoothed_arousal",
                     "confidence",
-                    "starting_timestamp",
-                    "current_timestamp",
+                    "timestamp",
                     "previous_layer_timestamp",
                     "smoothing_method",
                 ])
@@ -104,7 +103,7 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
                 "arousal": smooth_a,
                 "confidence": data["confidence"],
                 "starting_timestamp": start_timestamp,
-                "current_timestamp": current_timestamp,
+                "timestamp": timestamp,
             }
 
             if save_files:
@@ -116,8 +115,7 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
                     payload["valence"],
                     payload["arousal"],
                     payload["confidence"],
-                    payload["starting_timestamp"],
-                    payload["current_timestamp"],
+                    payload["timestamp"],
                     prev_layer_timestamp,
                     config["smoothing_method"],
                 ])

@@ -193,7 +193,7 @@ def predict_from_file(
         pow_vals = [row[col] for col in config["POW_COLUMNS"]]
         q_row = {
             "pow": pow_vals,
-            "current_timestamp": row["current_timestamp"],
+            "timestamp": row["timestamp"],
         }
         l1_queue.put(q_row)
     l1_queue.put(None)
@@ -252,7 +252,7 @@ def predict_from_queue(
                 break
 
             pow_values: list = row["pow"]
-            prev_layer_timestamp: float = row["current_timestamp"]
+            prev_layer_timestamp: float = row["timestamp"]
 
             normalized_values = normalizer.new_row(pow_values)
             pow_row = feat_select.process_data(normalized_values)
@@ -266,7 +266,7 @@ def predict_from_queue(
             prediction = classifier_manager.predict_with_confidence(pow_row)
             prediction_label = prediction["label"]
             prediction_conf = prediction["confidence"]
-            local_timestamp = time.time()
+            timestamp = time.time()
 
             predicted_labels.append(str(prediction["label"]))
 
@@ -274,8 +274,7 @@ def predict_from_queue(
                 pow_row,
                 prediction_label,
                 prediction_conf,
-                start_timestamp,
-                local_timestamp,
+                timestamp,
                 prev_layer_timestamp,
                 config.get("classifier_mode", "unknown"),
             )
@@ -283,7 +282,7 @@ def predict_from_queue(
             payload = {
                 "label": prediction_label,
                 "confidence": prediction_conf,
-                "timestamp": local_timestamp,
+                "timestamp": timestamp,
                 "starting_timestamp": start_timestamp,
             }
             l2_queue.put(payload)

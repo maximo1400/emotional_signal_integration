@@ -222,8 +222,7 @@ class Subcribe:
         stream_labels = data["labels"]
         if stream_name in ["eeg", "com", "fac", "mot", "met", "pow", "sys", "dev"]:
             stream_labels += [
-                "starting_timestamp",
-                "current_timestamp",
+                "timestamp",
             ]
         if self.verbose:
             print("**New Dataset**")
@@ -291,7 +290,7 @@ class Subcribe:
         if not isinstance(data, dict):
             return
 
-        eeg_data = data["eeg"] + [self.starting_timestamp, time.time()]
+        eeg_data = data["eeg"] + [time.time()]
         # self.data["eeg"].loc[len(self.data["eeg"])] = eeg_data
         self.data["eeg"].append(eeg_data)
         if self.verbose:
@@ -311,7 +310,7 @@ class Subcribe:
         if not isinstance(data, dict):
             return
 
-        mot_data = data["mot"] + [self.starting_timestamp, time.time()]
+        mot_data = data["mot"] + [time.time()]
         self.data["mot"].loc[len(self.data["mot"])] = mot_data
         if self.verbose:
             print("motion data: {}".format(data))
@@ -329,7 +328,7 @@ class Subcribe:
         data = kwargs.get("data")
         assert isinstance(data, dict)
 
-        dev_data = data["dev"] + [self.starting_timestamp, time.time()]
+        dev_data = data["dev"] + [time.time()]
         self.data["dev"].loc[len(self.data["dev"])] = dev_data
         if self.verbose:
             print("dev data: {}".format(data))
@@ -347,7 +346,7 @@ class Subcribe:
         data = kwargs.get("data")
         assert isinstance(data, dict)
 
-        met_data = data["met"] + [self.starting_timestamp, time.time()]
+        met_data = data["met"] + [time.time()]
         self.data["met"].loc[len(self.data["met"])] = met_data
         if self.verbose:
             print("pm data: {}".format(data))
@@ -367,10 +366,10 @@ class Subcribe:
         payload = {}
 
         local_time = time.time()
-        pow_data = data["pow"] + [self.starting_timestamp, local_time]
+        pow_data = data["pow"] + [local_time]
         self.data["pow"].loc[len(self.data["pow"])] = pow_data
         payload["pow"] = pow_data
-        payload["current_timestamp"] = local_time
+        payload["timestamp"] = local_time
         self.queue.put(payload)
         mean_pow = sum(data["pow"]) / len(data["pow"])
 
@@ -383,10 +382,7 @@ class Subcribe:
         if not isinstance(data, dict):
             return
 
-        com_data = list(data.values()) + [
-            self.starting_timestamp,
-            time.time(),
-        ]
+        com_data = list(data.values()) + [time.time()]
         self.data["com"].loc[len(self.data["com"])] = com_data
         if self.verbose:
             print("com data: {}".format(data))
@@ -396,7 +392,7 @@ class Subcribe:
         if not isinstance(data, dict):
             return
 
-        fe_data = list(data.values()) + [self.starting_timestamp, time.time()]
+        fe_data = list(data.values()) + [time.time()]
         self.data["fac"].loc[len(self.data["fac"])] = fe_data
         if self.verbose:
             print("fe data: {}".format(data))

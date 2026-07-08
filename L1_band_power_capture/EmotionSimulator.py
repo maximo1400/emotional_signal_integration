@@ -242,7 +242,7 @@ class EmotionSimulator:
             raise ValueError("Queue not initialized")
         self.out_queue.put({
             "pow": pow,
-            "current_timestamp": t_cur,
+            "timestamp": t_cur,
         })
         print(f"new data put in L1 queue, mean: {sum(pow) / len(pow):.4f}")
 
@@ -253,7 +253,6 @@ class EmotionSimulator:
             arousal,
             emot_state,
             smoothed,
-            self.starting_timestamp,
             t_cur,
         ]
         self.output_rows.append(new_row)
@@ -265,8 +264,7 @@ class EmotionSimulator:
             "arousal",
             "emot_state",
             "smoothed",
-            "starting_timestamp",
-            "current_timestamp",
+            "timestamp",
         ]
         self.output_df = pandas.DataFrame(self.output_rows, columns=columns)
 
