@@ -182,6 +182,7 @@ def calculate_metrics_and_plot(session_match, session_label):
     # If L3 is missing, just do Audio/Light plots and return
     if session_match["l3_csv"] is None:
         plot_audio_light(session_match, session_label, out_dir, session_id, data_start)
+        plot_audio_light(session_match, session_label, out_dir, session_id, data_start, include_emotions=True)
         print(f"Generated Unity-only analysis for {session_label} (ID: {session_id})")
         return {"session_label": session_label, "layers": layers, "latencies": latencies}
 
@@ -504,17 +505,22 @@ def calculate_metrics_and_plot(session_match, session_label):
     plt.close()
 
     plot_audio_light(session_match, session_label, out_dir, session_id, data_start)
+    plot_audio_light(session_match, session_label, out_dir, session_id, data_start, include_emotions=True)
 
     print(f"Generated advanced analysis for {session_label} (ID: {session_id})")
     return {"session_label": session_label, "layers": layers, "latencies": latencies}
 
-def plot_audio_light(session_match, session_label, out_dir, session_id, data_start):
+def plot_audio_light(session_match, session_label, out_dir, session_id, data_start, include_emotions=False):
     audio_csv = session_match.get("audio_csv")
     light_csv = session_match.get("light_csv")
     if not audio_csv and not light_csv:
         return
         
-    fig, axes = plt.subplots(2 if (audio_csv and light_csv) else 1, 1, figsize=(15, 8 if (audio_csv and light_csv) else 4), sharex=True)
+    num_subplots = 0
+    if audio_csv: num_subplots += 1
+    if light_csv: num_subplots += 1
+        
+    fig, axes = plt.subplots(num_subplots, 1, figsize=(15, 4 * num_subplots), sharex=True)
     if not isinstance(axes, np.ndarray): axes = [axes]
     ax_idx = 0
     
@@ -628,7 +634,7 @@ def plot_audio_light(session_match, session_label, out_dir, session_id, data_sta
             color = temple_colors[temple_name]
             ax.axvspan(group['time_warped'].min(), group['time_warped'].max(), color=color, alpha=0.4, label=f"Templo: {temple_name}")
             mid_point = group['time_warped'].min() + (group['time_warped'].max() - group['time_warped'].min()) / 2
-            ax.text(mid_point, 1.05, temple_name, ha='center', va='bottom', fontsize=10, fontweight='bold')
+            ax.text(mid_point, 1.05 if not include_emotions else 1.25, temple_name, ha='center', va='bottom', fontsize=10, fontweight='bold')
 
     if not df_audio.empty:
         ax = axes[ax_idx]
@@ -639,8 +645,15 @@ def plot_audio_light(session_match, session_label, out_dir, session_id, data_sta
         ax.plot(df_audio["time_warped"], df_audio["aysor_volume"], label="Audio Aysor (Q1)", alpha=0.7)
         ax.plot(df_audio["time_warped"], df_audio["memoir_volume"], label="Audio Memoir (Q3/Q4)", alpha=0.7)
         
-        ax.set_ylabel("Volumen Audio")
-        ax.set_ylim(0, 1.2)
+        if include_emotions and "valence" in df_audio.columns and "arousal" in df_audio.columns:
+            ax.plot(df_audio["time_warped"], (df_audio["valence"] + 1) / 2, label="Valencia", color="crimson", linewidth=2, linestyle='--')
+            ax.plot(df_audio["time_warped"], (df_audio["arousal"] + 1) / 2, label="Activación (Arousal)", color="mediumorchid", linewidth=2, linestyle='--')
+            ax.axhline(0.5, color="black", linestyle="--", alpha=0.3)
+            ax.set_ylim(0, 1.2)
+        else:
+            ax.set_ylim(0, 1.2)
+            
+        ax.set_ylabel("Volumen / Emoción")
         ax.set_title(f"Dinámica de Audio en Entorno Virtual - {session_label}", pad=20)
         
         handles, labels = ax.get_legend_handles_labels()
@@ -663,16 +676,25 @@ def plot_audio_light(session_match, session_label, out_dir, session_id, data_sta
         ax.scatter(df_light["time_warped"], df_light["target_intensity"], c=colors, s=50, label='Color Filtro', edgecolor='black', linewidth=0.5, zorder=3)
         ax.plot(df_light["time_warped"], df_light["target_intensity"], color='gray', alpha=0.3, zorder=2)
         
-        ax.set_ylabel("Valor de Señal Lumínica")
-        ax.set_ylim(-0.05, 1.2)
+        if include_emotions and "valence" in df_light.columns and "arousal" in df_light.columns:
+            ax.plot(df_light["time_warped"], (df_light["valence"] + 1) / 2, label="Valencia", color="crimson", linewidth=2, linestyle='--')
+            ax.plot(df_light["time_warped"], (df_light["arousal"] + 1) / 2, label="Activación (Arousal)", color="mediumorchid", linewidth=2, linestyle='--')
+            ax.axhline(0.5, color="black", linestyle="--", alpha=0.3)
+            ax.set_ylim(-0.05, 1.2)
+        else:
+            ax.set_ylim(-0.05, 1.2)
+            
+        ax.set_ylabel("Valor de Señal Lumínica / Emoción")
         ax.set_title(f"Dinámica de Luz (Color Ambiental) - {session_label}", pad=20)
         
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         ax.legend(by_label.values(), by_label.keys(), loc="upper left", bbox_to_anchor=(1.01, 1))
         ax.grid(True, alpha=0.5)
+        ax_idx += 1
         
     df_ref_warped = df_light if not df_light.empty else df_audio
+        
     if not df_ref_warped.empty:
         idx_samples = np.linspace(0, len(df_ref_warped)-1, min(10, len(df_ref_warped)), dtype=int)
         ticks_warped = df_ref_warped['time_warped'].iloc[idx_samples].values
@@ -682,7 +704,8 @@ def plot_audio_light(session_match, session_label, out_dir, session_id, data_sta
         axes[-1].set_xlabel("Tiempo (s)")
         
     plt.tight_layout()
-    plt.savefig(out_dir / "audio_light_dynamics.png", bbox_inches='tight')
+    filename = "audio_light_emotions_dynamics.png" if include_emotions else "audio_light_dynamics.png"
+    plt.savefig(out_dir / filename, bbox_inches='tight')
     plt.close()
 
 
