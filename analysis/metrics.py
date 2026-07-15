@@ -2,9 +2,9 @@ import shutil
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-import numpy as np
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -922,7 +922,7 @@ def main():
                     and df_l1_head["data_origin"].iloc[0] == "virtual"
                 ):
                     is_virtual = True
-            except:
+            except Exception:
                 pass
 
         if is_virtual:
@@ -934,10 +934,10 @@ def main():
 
         lat_data = calculate_metrics_and_plot(match, label)
         if lat_data["latencies"]:
-            for l, v in zip(lat_data["layers"], lat_data["latencies"]):
+            for layer_name, v in zip(lat_data["layers"], lat_data["latencies"]):
                 all_latencies.append({
                     "Session": lat_data["session_label"],
-                    "Capa": l,
+                    "Capa": layer_name,
                     "Latencia (ms)": v,
                 })
 
