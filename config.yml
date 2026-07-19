@@ -8,7 +8,7 @@ verbose: False
 # 1 socket listener is requied for the current L3 implementation
 start_socket_listener: True
 # Save output files from each layer
-save_output_files: False
+save_output_files: True
 
 # Layer 1: Data Source Configuration
 
@@ -66,7 +66,17 @@ sequences:
   bored_angry:
     - [bored, 2]
     - [angry, 2]
-
+  whole_range:
+  - [bored, 5]
+  - [frustrated, 5]
+  - [angry, 5]
+  - [tired, 5]
+  - [neutral, 5]
+  - [surprise, 5]
+  - [calm, 5]
+  - [happy, 5]
+  - [excited, 5]
+ 
 ## Emotional simulator set up
 # Path to the .mat file containing the DREAMER raw data
 dreamer_mat_path: Dreamer/DREAMER.mat
