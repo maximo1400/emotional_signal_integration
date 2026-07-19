@@ -176,6 +176,7 @@ def find_matching_sessions():
                 f"Discovered Unity-only Session {ts_str} (Audio: {bool(audio_csv)}, Light: {bool(light_csv)})"
             )
 
+    matches.sort(key=lambda x: float(x["session_id"]))
     return matches
 
 
@@ -926,11 +927,9 @@ def main():
                 pass
 
         if is_virtual:
-            label = f"Virtual-{virt_idx}"
-            virt_idx += 1
+            label = "Virtual"
         else:
-            label = f"Emotiv-{emot_idx}"
-            emot_idx += 1
+            label = "Emotiv"
 
         lat_data = calculate_metrics_and_plot(match, label)
         if lat_data["latencies"]:
@@ -944,15 +943,40 @@ def main():
     # --- Unified Latency Plot ---
     if all_latencies:
         df_lat = pd.DataFrame(all_latencies)
+        
+        # Determine palettes and styles
+        sessions = df_lat["Session"].unique()
+        emotiv_sessions = sorted([s for s in sessions if "Emotiv" in s])
+        virtual_sessions = sorted([s for s in sessions if "Virtual" in s])
+        
+        # Use Oranges for Emotiv and Blues for Virtual (skipping the lightest colors)
+        e_colors = sns.color_palette("Oranges", n_colors=len(emotiv_sessions) + 2)[2:]
+        v_colors = sns.color_palette("Blues", n_colors=len(virtual_sessions) + 2)[2:]
+        
+        palette = {}
+        dashes = {}
+        
+        for s, c in zip(emotiv_sessions, e_colors):
+            palette[s] = c
+            dashes[s] = (2, 2)  # Dotted
+            
+        for s, c in zip(virtual_sessions, v_colors):
+            palette[s] = c
+            dashes[s] = ""  # Solid
+            
         plt.figure(figsize=(10, 6))
         ax = sns.lineplot(
             data=df_lat,
             x="Capa",
             y="Latencia (ms)",
             hue="Session",
+            style="Session",
+            palette=palette,
+            dashes=dashes,
             marker="o",
             linewidth=2,
             markersize=8,
+            alpha=0.6,
         )
 
         total_latencies = df_lat.groupby("Session")["Latencia (ms)"].sum().reset_index()
@@ -963,9 +987,11 @@ def main():
             x="Capa",
             y="Latencia (ms)",
             hue="Session",
+            palette=palette,
             ax=ax,
             marker="o",
             s=80,
+            alpha=0.6,
             legend=False,
             zorder=3,
         )
