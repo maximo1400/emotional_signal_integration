@@ -753,12 +753,7 @@ def plot_audio_light(
             label="Audio Aysor (Q1)",
             alpha=0.7,
         )
-        ax.plot(
-            df_audio["time_warped"],
-            df_audio["memoir_volume"],
-            label="Audio Memoir (Q3/Q4)",
-            alpha=0.7,
-        )
+
 
         if (
             include_emotions
