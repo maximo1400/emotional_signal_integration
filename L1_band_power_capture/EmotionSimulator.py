@@ -308,16 +308,16 @@ class EmotionSimulator:
             )
 
         # Plot scatter points on top
-        for state, ranges in self.emot_states_area.items():
-            state_data = self.data[self.data["state"] == state]
-            plt.scatter(
-                state_data["valence"],
-                state_data["arousal"],
-                # color=state_colors[state],
-                color="red",
-                alpha=0.6,
-                s=20,
-            )
+        # Always plot all data to show full distribution across all subjects
+        plot_data = self.data
+
+        plt.scatter(
+            plot_data["valence"],
+            plot_data["arousal"],
+            color="red",
+            alpha=0.6,
+            s=20,
+        )
 
         plt.xlabel("Valence")
         plt.ylabel("Arousal")
