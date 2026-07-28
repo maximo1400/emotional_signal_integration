@@ -285,6 +285,7 @@ def calculate_metrics_and_plot(session_match, session_label):
             "previous_layer_timestamp",
             "classifier_mode",
             "latency_l1_to_l2",
+            "y_true",
         }
         input_size = len([c for c in df_l2.columns if c not in meta_cols])
 

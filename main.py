@@ -43,14 +43,20 @@ def main() -> None:
             l3_listener_thread = threading.Thread(target=run_l3_listener, daemon=True)
             l3_listener_thread.start()
 
-        l3_thread = threading.Thread(target=run_l3, args=(l2_out, starting_timestamp), daemon=True)
+        l3_thread = threading.Thread(
+            target=run_l3, args=(l2_out, starting_timestamp), daemon=True
+        )
         l3_thread.start()
 
-        l2_thread = threading.Thread(target=run_l2, args=(l1_out, l2_out, starting_timestamp), daemon=True)
+        l2_thread = threading.Thread(
+            target=run_l2, args=(l1_out, l2_out, starting_timestamp), daemon=True
+        )
         l2_thread.start()
 
     if classif_mode == "predict_from_queue":
         run_l1(l1_out, starting_timestamp)
+        l2_thread.join()
+        l3_thread.join()
     elif classif_mode == "predict_from_file":
         l2_thread.join()
         l3_thread.join()
