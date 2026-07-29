@@ -45,9 +45,9 @@ def run_l3_listener() -> None:
                         continue
                     try:
                         payload = json.loads(line)
-                        print(f"Socket payload: {payload}\n")
+                        print(f"Socket payload: {payload}\n", flush=True)
                     except json.JSONDecodeError:
-                        print(f"socket raw: {line}")
+                        print(f"socket raw: {line}", flush=True)
     else:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((host, port))
