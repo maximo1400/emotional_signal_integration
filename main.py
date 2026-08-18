@@ -38,6 +38,8 @@ def main() -> None:
     if classif_mode == "train":
         run_l2(l1_out, l2_out, starting_timestamp)
 
+    l2_ready_event = threading.Event()
+
     if classif_mode in ["predict_from_queue", "predict_from_file"]:
         if listen_out:
             l3_listener_thread = threading.Thread(target=run_l3_listener, daemon=True)
@@ -49,11 +51,15 @@ def main() -> None:
         l3_thread.start()
 
         l2_thread = threading.Thread(
-            target=run_l2, args=(l1_out, l2_out, starting_timestamp), daemon=True
+            target=run_l2,
+            args=(l1_out, l2_out, starting_timestamp),
+            kwargs={"ready_event": l2_ready_event},
+            daemon=True,
         )
         l2_thread.start()
 
     if classif_mode == "predict_from_queue":
+        l2_ready_event.wait(timeout=10.0)
         run_l1(l1_out, starting_timestamp)
         l2_thread.join()
         l3_thread.join()

@@ -208,8 +208,19 @@ def calculate_metrics_and_plot(session_match, session_label):
         }
 
     # Load data
-    df_l3 = pd.read_csv(session_match["l3_csv"])
-    df_l2 = pd.read_csv(session_match["l2_csv"]) if session_match["l2_csv"] else None
+    try:
+        df_l3 = pd.read_csv(session_match["l3_csv"])
+        if df_l3.empty:
+            return {"session_label": session_label, "layers": [], "latencies": []}
+    except Exception:
+        return {"session_label": session_label, "layers": [], "latencies": []}
+
+    try:
+        df_l2 = (
+            pd.read_csv(session_match["l2_csv"]) if session_match["l2_csv"] else None
+        )
+    except Exception:
+        df_l2 = None
 
     # Handle L1 and ground truth
     df_l1 = None

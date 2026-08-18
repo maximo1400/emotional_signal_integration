@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import pandas
 import pyarrow.feather as feather
 
+from L1_band_power_capture.utils import L1OutputWriter
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_loader import get_config
 
@@ -29,9 +31,18 @@ class EmotionSimulator:
     pow_read = {}
     transition_duration = 0
 
-    def __init__(self, queue: queue.Queue, starting_timestamp: float):
+    def __init__(
+        self,
+        queue: queue.Queue,
+        starting_timestamp: float,
+        writer: L1OutputWriter,
+        data_origin: str = "virtual",
+    ):
         self.starting_timestamp = starting_timestamp
         self.out_queue = queue
+        self.writer = writer
+        self.data_origin = data_origin
+        self.output_rows = []
         self.load_yml_config()
         self.load_pow_data()
         self.add_emot_states()
@@ -244,7 +255,7 @@ class EmotionSimulator:
             "pow": pow,
             "timestamp": t_cur,
         })
-        print(f"new data put in L1 queue, mean: {sum(pow) / len(pow):.4f}")
+        print(f"new data put in L1 queue, mean: {sum(pow) / len(pow):.4f}", flush=True)
 
     def update_output_rows(self, pow, emot_state, valence, arousal, smoothed, t_cur):
         "adds a new row to the output with the pow data, emotional state, valence, arousal, smoothed flag and timestamp"
@@ -256,6 +267,15 @@ class EmotionSimulator:
             t_cur,
         ]
         self.output_rows.append(new_row)
+        self.writer.write_row(
+            pow,
+            valence,
+            arousal,
+            emot_state,
+            smoothed,
+            t_cur,
+            self.data_origin,
+        )
 
     def finalize_output_df(self):
         "finalizes the output dataframe by converting the output rows to a dataframe with the correct columns"

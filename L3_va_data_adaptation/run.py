@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from L3_va_data_adaptation.smoother import DataSmoother
+from L3_va_data_adaptation.utils import L3OutputWriter
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -46,7 +47,10 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
             f"L3 starting with {method} smoothing. Socket on {host}:{port} ({protocol})"
         )
 
-    output_file = None
+    ts_int = int(start_timestamp)
+    output_file = Path(config["l3_output_folder"]) / f"out_{ts_int}.csv"
+    writer = L3OutputWriter(output_file, save_files)
+    writer.write_headers()
 
     # Setup socket
     if protocol == "tcp":
@@ -63,10 +67,6 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
         addr = (host, port)
 
     try:
-        f = None
-        writer = None
-        first_loop = True
-
         while True:
             data = l2_out_queue.get()
             if data is None:
@@ -80,24 +80,6 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
             timestamp = time.time()
             prev_layer_timestamp = data["timestamp"]
 
-            if first_loop and save_files:
-                ts_int = int(start_timestamp)
-                output_file = Path(config["l3_output_folder"]) / f"out_{ts_int}.csv"
-                output_file.parent.mkdir(parents=True, exist_ok=True)
-                f = output_file.open("w", newline="", encoding="utf-8")
-                writer = csv.writer(f)
-                writer.writerow([
-                    "raw_valence",
-                    "raw_arousal",
-                    "smoothed_valence",
-                    "smoothed_arousal",
-                    "confidence",
-                    "timestamp",
-                    "previous_layer_timestamp",
-                    "smoothing_method",
-                ])
-                first_loop = False
-
             payload = {
                 "valence": smooth_v,
                 "arousal": smooth_a,
@@ -106,20 +88,16 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
                 "timestamp": timestamp,
             }
 
-            if save_files:
-                if writer is None or f is None:
-                    raise ValueError("Writer not initialized")
-                writer.writerow([
-                    raw_v,
-                    raw_a,
-                    payload["valence"],
-                    payload["arousal"],
-                    payload["confidence"],
-                    payload["timestamp"],
-                    prev_layer_timestamp,
-                    config["smoothing_method"],
-                ])
-                f.flush()
+            writer.write_row(
+                raw_v,
+                raw_a,
+                smooth_v,
+                smooth_a,
+                payload["confidence"],
+                payload["timestamp"],
+                prev_layer_timestamp,
+                config["smoothing_method"],
+            )
 
             message = json.dumps(payload) + "\n"
 
@@ -138,8 +116,7 @@ def run_l3(l2_out_queue: queue.Queue, start_timestamp: float):
                     while not l2_out_queue.empty():
                         l2_out_queue.get_nowait()
     finally:
-        if f is not None:
-            f.close()
+        writer.close()
         if verbose and save_files:
             print(f"L3 saved output to {output_file}")
         if protocol == "tcp" and "conn" in locals() and conn != server_socket:

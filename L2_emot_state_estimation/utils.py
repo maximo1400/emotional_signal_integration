@@ -150,6 +150,8 @@ class PredictionWriter:
     def close(self):
         if self.f is not None:
             self.f.close()
+            self.f = None
+            self.writer = None
 
 
 def _split_va_labels(labels: list[str] | pd.Series) -> tuple[list[str], list[str]]:

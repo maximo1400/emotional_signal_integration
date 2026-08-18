@@ -1,8 +1,6 @@
 import queue
 import time
 
-import pandas as pd
-
 from L1_band_power_capture.Emotiv.cortex import Cortex
 
 from . import cortex
@@ -43,9 +41,13 @@ class Subcribe:
         app_client_secret,
         verbose: bool,
         starting_timestamp: float,
+        writer,
+        data_origin: str = "emotiv",
         **kwargs,
     ):
         self.starting_timestamp = starting_timestamp
+        self.writer = writer
+        self.data_origin = data_origin
         self.c = Cortex(app_client_id, app_client_secret, debug_mode=verbose, **kwargs)
         self.c.bind(create_session_done=self.on_create_session_done)
         self.c.bind(new_data_labels=self.on_new_data_labels)
@@ -226,12 +228,10 @@ class Subcribe:
             ]
         if self.verbose:
             print("**New Dataset**")
-        if stream_name != "eeg":
-            self.data[stream_name] = pd.DataFrame(columns=stream_labels)
-        else:
-            # eeg data grows too fast to be stored in a dataframe
-            self.data[stream_name] = []
-            self.data["eeg_columns"] = pd.DataFrame(columns=stream_labels)
+        self.data[stream_name] = []
+        if not hasattr(self, "data_labels"):
+            self.data_labels = {}
+        self.data_labels[stream_name] = stream_labels
         if self.verbose:
             print("{} labels are : {}".format(stream_name, stream_labels))
 
@@ -311,7 +311,7 @@ class Subcribe:
             return
 
         mot_data = data["mot"] + [time.time()]
-        self.data["mot"].loc[len(self.data["mot"])] = mot_data
+        self.data["mot"].append(mot_data)
         if self.verbose:
             print("motion data: {}".format(data))
 
@@ -329,7 +329,7 @@ class Subcribe:
         assert isinstance(data, dict)
 
         dev_data = data["dev"] + [time.time()]
-        self.data["dev"].loc[len(self.data["dev"])] = dev_data
+        self.data["dev"].append(dev_data)
         if self.verbose:
             print("dev data: {}".format(data))
 
@@ -347,7 +347,7 @@ class Subcribe:
         assert isinstance(data, dict)
 
         met_data = data["met"] + [time.time()]
-        self.data["met"].loc[len(self.data["met"])] = met_data
+        self.data["met"].append(met_data)
         if self.verbose:
             print("pm data: {}".format(data))
 
@@ -367,11 +367,21 @@ class Subcribe:
 
         local_time = time.time()
         pow_data = data["pow"] + [local_time]
-        self.data["pow"].loc[len(self.data["pow"])] = pow_data
+        self.data["pow"].append(pow_data)
         payload["pow"] = data["pow"]
         payload["timestamp"] = local_time
         self.queue.put(payload)
         mean_pow = sum(data["pow"]) / len(data["pow"])
+
+        self.writer.write_row(
+            data["pow"],
+            valence=0.0,
+            arousal=0.0,
+            emot_state="NA",
+            smoothed=False,
+            timestamp=local_time,
+            data_origin=self.data_origin,
+        )
 
         if self.verbose:
             print(f"pow data put in queue, mean pow: {mean_pow}")
@@ -383,7 +393,7 @@ class Subcribe:
             return
 
         com_data = [data["action"], data["power"], time.time()]
-        self.data["com"].loc[len(self.data["com"])] = com_data
+        self.data["com"].append(com_data)
         if self.verbose:
             print("com data: {}".format(data))
 
@@ -392,8 +402,15 @@ class Subcribe:
         if not isinstance(data, dict):
             return
 
-        fe_data = [data["eyeAct"], data["uAct"], data["uPow"], data["lAct"], data["lPow"], time.time()]
-        self.data["fac"].loc[len(self.data["fac"])] = fe_data
+        fe_data = [
+            data["eyeAct"],
+            data["uAct"],
+            data["uPow"],
+            data["lAct"],
+            data["lPow"],
+            time.time(),
+        ]
+        self.data["fac"].append(fe_data)
         if self.verbose:
             print("fe data: {}".format(data))
 

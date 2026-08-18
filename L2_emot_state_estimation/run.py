@@ -10,6 +10,7 @@ Modes:
 
 import queue
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -185,20 +186,25 @@ def predict_from_file(
         true_arousals = _set_va_range(df["arousal"].tolist(), num_classes)
         true_labels = _va_to_label(true_valences, true_arousals)
 
-    # df_pow = df.reindex(columns=config["POW_COLUMNS"])
-    for idx, row in df.iterrows():
-        pow_vals = [row[col] for col in config["POW_COLUMNS"]]
-        q_row = {
-            "pow": pow_vals,
-            "timestamp": row["timestamp"],
-        }
-        l1_queue.put(q_row)
-    l1_queue.put(None)
+    def _push_rows():
+        time.sleep(0.5)  # Allow predict_from_queue to load model in main thread
+        for idx, row in df.iterrows():
+            pow_vals = [row[col] for col in config["POW_COLUMNS"]]
+            q_row = {
+                "pow": pow_vals,
+                "timestamp": time.time(),
+            }
+            l1_queue.put(q_row)
+        l1_queue.put(None)
+
+    push_thread = threading.Thread(target=_push_rows, daemon=True)
+    push_thread.start()
 
     print(
-        "Finished sending pow vectors to L1 queue, now will run L2 in predict_from_queue mode"
+        "Started sending pow vectors to L1 queue, now running L2 in predict_from_queue mode"
     )
     predict_from_queue(l1_queue, l2_queue, starting_timestamp, true_labels=true_labels)
+    push_thread.join()
 
 
 def predict_from_queue(
@@ -206,6 +212,7 @@ def predict_from_queue(
     l2_queue: queue.Queue,
     start_timestamp: float,
     true_labels: list[str] | None = None,
+    ready_event: threading.Event | None = None,
 ):
     config = get_config([
         "models_folder",
@@ -230,13 +237,19 @@ def predict_from_queue(
     print("Running L2 in predict_from_queue mode")
 
     feat_select = FeatureSelector()
+    feature_names = feat_select.get_final_feature_names()
 
     output_file = Path(config["l2_output_folder"]) / f"out_{int(start_timestamp)}.csv"
     pred_writer = PredictionWriter(output_file, save_files, true_labels)
+    pred_writer.write_headers(feature_names)
     predicted_labels = []
 
+    classifier_manager = ClassifierManager(len(feature_names))
+    classifier_manager.load(model_path, num_classes=num_classes)
+    if ready_event is not None:
+        ready_event.set()
+
     try:
-        first_loop = True
         normalizer = EPOCCrossSessionNormalizer()
 
         while True:
@@ -253,12 +266,6 @@ def predict_from_queue(
 
             normalized_values = normalizer.new_row(pow_values)
             pow_row = feat_select.process_data(normalized_values)
-
-            if first_loop:
-                pred_writer.write_headers(feat_select.get_final_feature_names())
-                classifier_manager = ClassifierManager(len(pow_row))
-                classifier_manager.load(model_path, num_classes=num_classes)
-                first_loop = False
 
             prediction = classifier_manager.predict_with_confidence(pow_row)
             prediction_label = prediction["label"]
@@ -283,7 +290,7 @@ def predict_from_queue(
                 "starting_timestamp": start_timestamp,
             }
             l2_queue.put(payload)
-            print(f"Classifier output: {payload}")
+            print(f"Classifier output: {payload}", flush=True)
     finally:
         pred_writer.close()
         if verbose and save_files:
@@ -313,7 +320,12 @@ def predict_from_queue(
             l2_queue.put(None)
 
 
-def run_l2(l1_queue: queue.Queue, l2_queue: queue.Queue, starting_timestamp: float):
+def run_l2(
+    l1_queue: queue.Queue,
+    l2_queue: queue.Queue,
+    starting_timestamp: float,
+    ready_event: threading.Event | None = None,
+):
     config = get_config(["classifier_mode"])
     mode: str = config["classifier_mode"]
 
@@ -322,4 +334,6 @@ def run_l2(l1_queue: queue.Queue, l2_queue: queue.Queue, starting_timestamp: flo
     elif mode == "predict_from_file":
         predict_from_file(l1_queue, l2_queue, starting_timestamp)
     elif mode == "predict_from_queue":
-        predict_from_queue(l1_queue, l2_queue, starting_timestamp)
+        predict_from_queue(
+            l1_queue, l2_queue, starting_timestamp, ready_event=ready_event
+        )

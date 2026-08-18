@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 
 from L1_band_power_capture.EmotionSimulator import EmotionSimulator
 from L1_band_power_capture.Emotiv.Emotiv import Subcribe
+from L1_band_power_capture.utils import L1OutputWriter
 
 # Add parent directory to path to import config_loader
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -47,21 +48,23 @@ def run_l1(l1_out_queue: queue.Queue, starting_timestamp: float):
         "profile_name",
         "verbose",
         "save_output_files",
+        "POW_COLUMNS",
     ])
 
-    if config["pow_data_source"] == "virtual":
-        simulator = EmotionSimulator(l1_out_queue, starting_timestamp)
-        simulator.main_loop()
+    ds = config["pow_data_source"]
+    st_ts = int(starting_timestamp)
+    output_file = Path(config["L1_output_folder"]) / f"out_{st_ts}.csv"
+    writer = L1OutputWriter(output_file, config["save_output_files"])
+    writer.write_headers(config["POW_COLUMNS"])
 
-        if config["save_output_files"]:
-            ds = config["pow_data_source"]
-            st_ts = int(simulator.starting_timestamp)
-            output_file = Path(config["L1_output_folder"]) / f"out_{st_ts}.csv"
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            if simulator.output_df is None:
-                raise ValueError("output_df not generated")
-            simulator.output_df["data_origin"] = ds
-            simulator.output_df.to_csv(output_file, index=False)
+    if ds == "virtual":
+        simulator = EmotionSimulator(
+            l1_out_queue,
+            starting_timestamp,
+            writer=writer,
+            data_origin=ds,
+        )
+        simulator.main_loop()
         return
 
     # Emotiv data source logic
@@ -78,6 +81,8 @@ def run_l1(l1_out_queue: queue.Queue, starting_timestamp: float):
         emotiv_client_secret,
         verbose=config["verbose"],
         starting_timestamp=starting_timestamp,
+        writer=writer,
+        data_origin=ds,
     )
 
     monitor_thread = threading.Thread(
@@ -100,11 +105,20 @@ def run_l1(l1_out_queue: queue.Queue, starting_timestamp: float):
     print(f"Tiempo de Aplicacion: {int(((t1 - t0) / 60) * 100) / 100} min")
 
     if config["save_output_files"]:
-        ds = config["pow_data_source"]
-        st_ts = int(emotiv.starting_timestamp)
         output_dir = Path(config["L1_output_folder"]) / f"out_{st_ts}"
         output_dir.mkdir(parents=True, exist_ok=True)
+        import pandas as pd
+
         for stream in emotiv.data:
-            data_to_save = emotiv.data[stream]
+            if stream == "pow":
+                continue  # pow is written via L1OutputWriter
+            raw_stream_data = emotiv.data[stream]
+            if isinstance(raw_stream_data, list):
+                cols = getattr(emotiv, "data_labels", {}).get(stream, None)
+                data_to_save = pd.DataFrame(raw_stream_data, columns=cols)
+            else:
+                data_to_save = raw_stream_data
             data_to_save["data_origin"] = ds
             data_to_save.to_csv(output_dir / f"{stream}.csv", index=False)
+
+        writer.close()
